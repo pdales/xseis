@@ -45,6 +45,12 @@ class Vector {
 
 		T max(){return *std::max_element(data_, data_ + size_);}
 		void fill(T value){std::fill(data_, data_ + size_, value);}
+		
+		void multiply(T value){
+			for (uint32_t i = 0; i < size_; ++i) {
+				data_[i] *= value;
+			}
+		}
 	
 };
 
@@ -101,23 +107,28 @@ class Array2D {
 		T* begin() {return data_;}
 		T* end() {return data_ + size_;}
 
-		Vector<T> sum_rows() {
+		Vector<T> mean_rows() {
 
 			Vector<T> out = Vector<T>(ncol_);
 			out.fill(0);
 			float *out_ptr = nullptr;
 
+			// sum each row			
 			for (uint32_t i = 0; i < nrow_; ++i)
 			{
-				out_ptr = data_ + i * ncol_;		
-				for (uint32_t j = 0; j < ncol_; ++j)
-				{
-					out[j] += out_ptr[j];
-				}
-			}
-			return out;	
+				out_ptr = data_ + i * ncol_;
 
+				for (uint32_t j = 0; j < ncol_; ++j) {
+					out[j] += out_ptr[j];
+				}				
+			}
+			// divide by ncol to get mean
+			for (uint32_t j = 0; j < ncol_; ++j) {
+					out[j] /= ncol_;
+				}
+			return out;	
 		}
+
 
 		void fill(T value){std::fill(data_, data_ + size_, value);}	
 };

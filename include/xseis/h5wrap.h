@@ -20,7 +20,7 @@ struct Dataset {
 	hsize_t nrow_, ncol_, size_;
 	size_t rank_;
 	H5::DataType dtype_;
-	hsize_t shape_[2];    // dataset dimensions
+	hsize_t shape_[2] = {1, 1};    // dataset dimensions
 
 	// const H5std_string dset_name; 
 	
@@ -52,7 +52,7 @@ struct Dataset {
 		}
 
 
-	Array2D<float> load_full() {
+	Array2D<float> load_float_array() {
 		// hsize_t dim_flat[1] = {size_};
 		auto arr = Array2D<float>({(uint32_t) nrow_, (uint32_t) ncol_});
 		H5::DataSpace mspace(rank_, shape_);
@@ -60,8 +60,16 @@ struct Dataset {
 		return arr;		
 		}
 
+	Vector<float> load_float_vector() {
+		// hsize_t dim_flat[1] = {size_};
+		auto vec = Vector<float>(nrow_);
+		H5::DataSpace mspace(1, shape_);
+		dset_.read(vec.data_, dtype_, mspace, filespace_);
+		return vec;		
+		}
+
 	template <typename T>	
-	void load_slab(Array2D<T> &arr, hsize_t offset[2]) {
+	void LoadChunk(Array2D<T> &arr, hsize_t offset[2]) {
 
 		// Define slab size
 		hsize_t count[2] = {arr.nrow_, arr.ncol_};

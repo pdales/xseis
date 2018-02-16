@@ -47,19 +47,18 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 			#pragma omp simd \
 			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
 			for (uint32_t j = 0; j < ttable.ncol_; ++j)
-				{
-					ixc = (tts_sta2[j] - tts_sta1[j]) % cclen;
-					out_ptr[j] += cc_ptr[ixc];
-				}	
+			{
+				ixc = (tts_sta2[j] - tts_sta1[j]) % cclen;
+				out_ptr[j] += cc_ptr[ixc];
+			}
 		}
-
 	}	
 	return output;
 }
 
 
 
-Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, float sr, float vel)
+Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, float vel, float sr)
 {
 	auto ttable = Array2D<uint16_t>(stalocs.nrow_, gridlocs.nrow_);
 
@@ -72,6 +71,46 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 		{
 			dist = DistCartesian(stalocs.row(i), gridlocs.row(j));			
 			ttable(i, j) = static_cast<uint16_t>(dist * vsr + 0.5);
+		}
+	}
+
+	return ttable;
+}
+
+
+Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, Vector<float>& vel_effective, float sr)
+{
+	uint32_t ngrid = gridlocs.nrow_;
+	uint32_t nsta = stalocs.nrow_;
+
+	auto ttable = Array2D<uint16_t>(nsta, ngrid);
+
+	// compute velocity sampling rate
+	auto vsr = Vector<float>(vel_effective.size_);
+	for (int i = 0; i < vsr.size_; ++i)
+	{
+		vsr[i] = sr / vel_effective[i];
+	}
+
+	auto vsr_grid = Vector<float>(ngrid);
+
+	for (uint32_t i = 0; i < ngrid; ++i){
+		vsr_grid[i] = vsr[static_cast<uint16_t>(gridlocs[i * 3 + 2])];
+	}
+
+	float dist;
+	float vsr_depth;
+	float *sloc = nullptr;
+
+	for (uint32_t i = 0; i < ttable.nrow_; ++i)
+	{
+		sloc = stalocs.row(i);
+
+		for (uint32_t j = 0; j < ttable.ncol_; ++j) 
+		{	
+			dist = DistCartesian(sloc, gridlocs.row(j));
+			// vsr_depth = vsr[static_cast<uint16_t>(gridlocs(j, 2))];
+			ttable(i, j) = static_cast<uint16_t>(dist * vsr_grid[j] + 0.5);
 		}
 	}
 

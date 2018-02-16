@@ -11,7 +11,7 @@ namespace utils {
 
 Array2D<uint16_t> unique_pairs(Vector<uint16_t>& keys)
 {
-	uint16_t npair = 0;
+	uint64_t npair = 0;
 
 	// crude way to calc nkeys (wil use dist filters later)
 	for (int i = 0; i < keys.size_; ++i)
@@ -22,8 +22,8 @@ Array2D<uint16_t> unique_pairs(Vector<uint16_t>& keys)
 		}
 	}
 
-	auto ckeys = Array2D<uint16_t>({npair, 2});
-	uint16_t row_ix = 0;
+	auto ckeys = Array2D<uint16_t>(npair, 2);
+	uint64_t row_ix = 0;
 
 	for (int i = 0; i < keys.size_; ++i)
 	{
@@ -133,21 +133,22 @@ void write(std::string fname, Array2D<T>& arr){
 	myfile.close();	
 }
 
-// template <typename T>
-// void WritePower(std::string fname, Vector<float> pwr, Grid& grid){
-// 	// std::cout.precision(10);
-// 	std::ofstream myfile (fname);
-// 	myfile << grid.nx << "\n";
+void WritePowerGrid(std::string fname, Vector<float>& pwr, Grid& grid){
 
+	std::ofstream myfile (fname);
 
-// 	for (int i = 0; i < arr.nrow_; ++i) {	
-// 		for (int j = 0; j < arr.ncol_; ++j) {
-// 			myfile << arr(i, j) << " ";
-// 		}
-// 		myfile << "\n";
-// 	}
-// 	myfile.close();	
-// }
+	for (int i = 0; i < grid.lims.size(); ++i)
+	{
+		myfile << grid.lims[i] << " ";		
+	}
+	myfile << "\n";
+	myfile << grid.nz << " " << grid.ny << " " << grid.nx << "\n";
+
+	for (int i = 0; i < pwr.size_; ++i) {	
+		myfile << pwr[i] << " ";
+	}
+	myfile.close();	
+}
 
 
 template <typename T>
