@@ -11,130 +11,144 @@
 /// namespace structures {
 
 template <typename T>
-class Vector {
-	public:
-		T *data_ = nullptr;
-		uint32_t size_ = 0;
+class Vector {	
+public:
+	T *data_ = nullptr;
+	uint64_t size_ = 0;
 
-		Vector() {}
-		Vector(T *data, uint32_t size): data_(data), size_(size) {}
-		Vector(uint32_t size): size_(size) {data_ = new T[size_]();}
+	Vector() {}
+	Vector(T *data, uint64_t size): data_(data), size_(size) {}
+	Vector(uint64_t size): size_(size) {data_ = new T[size_]();}
 
-		~Vector(){delete data_;}
-		void set_data_(T* arg) {data_ = arg;}
+	~Vector(){delete data_;}
+	void set_data_(T* arg) {data_ = arg;}
 
-		void arange(T start, T stop, T step){
-			size_ = (stop - start) / step;
+	void arange(T start, T stop, T step){
+		size_ = (stop - start) / step;
 
-			for (uint32_t i = 0; i < size_; ++i) {
-				data_[i] = start + i * step;			
-			}
+		for (uint64_t i = 0; i < size_; ++i) {
+			data_[i] = start + i * step;			
 		}
+	}
 
-		T& operator[] (uint32_t ix) {return data_[ix];}
-		T& operator() (uint32_t ix){return data_[ix];}
-		T* ptr(uint32_t ix) {
-			return data_ + ix;
-		}
-		T* begin() {return data_;}
-		T* end() {return data_ + size_;}
+	T& operator[] (uint64_t ix) {return data_[ix];}
+	T& operator() (uint64_t ix){return data_[ix];}
+	T* ptr(uint64_t ix) {
+		return data_ + ix;
+	}
+	T* begin() {return data_;}
+	T* end() {return data_ + size_;}
 
-		uint32_t argmax(){
-			return std::distance(data_, std::max_element(data_, data_ + size_));
-		}
+	uint64_t argmax(){
+		return std::distance(data_, std::max_element(data_, data_ + size_));
+	}
 
-		T max(){return *std::max_element(data_, data_ + size_);}
-		void fill(T value){std::fill(data_, data_ + size_, value);}
-		
-		void multiply(T value){
-			for (uint32_t i = 0; i < size_; ++i) {
-				data_[i] *= value;
-			}
+	T max(){return *std::max_element(data_, data_ + size_);}
+	void fill(T value){std::fill(data_, data_ + size_, value);}
+	
+	void multiply(T value){
+		for (uint64_t i = 0; i < size_; ++i) {
+			data_[i] *= value;
 		}
+	}
 	
 };
 
 template <typename T>
 class Array2D {
-	public:
-		T *data_ = nullptr;
-		uint32_t nrow_, ncol_;
-		uint64_t size_;
-		uint32_t shape_[2];
+public:
+	T *data_ = nullptr;
+	uint64_t nrow_, ncol_;
+	uint64_t size_ = 0;
+	uint64_t shape_[2];
 
-		// Array2D() {}
-		// init from existing allocated memory - deprecated
-		Array2D(T *data, uint32_t nrow, uint32_t ncol)
-		: data_(data), nrow_(nrow), ncol_(ncol), size_(nrow * ncol) 
+	// // Array2D() {}
+	// // init from existing allocated memory - deprecated
+	Array2D(T *data, uint64_t nrow, uint64_t ncol)
+	:data_(data), nrow_(nrow), ncol_(ncol) 
+	{
+		size_ = (uint64_t) nrow_ * ncol_;
+		shape_[0] = nrow_;
+		shape_[1] = ncol_;
+	}
+
+	// init array and allocate memory
+	Array2D(uint64_t nrow, uint64_t ncol)
+	: nrow_(nrow), ncol_(ncol){
+		size_ = (uint64_t) nrow_ * ncol_;
+		shape_[0] = nrow_;
+		shape_[1] = ncol_;
+		data_ = new T[size_];
+	}
+
+	// // init array from shape and allocate memory
+	// Array2D(uint64_t shape[2])
+	// : nrow_(shape[0]), ncol_(shape[1]), size_(nrow_ * ncol_){
+	// 	shape_[0] = nrow_;
+	// 	shape_[1] = ncol_;
+	// 	data_ = new T[size_];
+	// }
+
+	~Array2D(){delete data_;}
+	// force move constructor
+	Array2D(Array2D&&) = default;
+
+	// Get value at flattened index ix
+	T& operator[] (uint64_t ix){return data_[ix];}
+
+	// Get value at simulated (row, col)
+	T& operator() (uint64_t ix_row, uint64_t ix_col){
+		return data_[ix_row * ncol_ + ix_col];
+	}
+
+	// Return pointer to i'th row, segfaults for large arrays..
+	T* row(uint64_t irow) {
+		return data_ + (irow * ncol_);
+		// return data_ + (irow * ncol_);
+	}
+
+	// Return pointer to zeroth element
+	T* begin() {return data_;}
+	T* end() {return data_ + size_;}
+
+	Vector<T> mean_rows() {
+
+		Vector<T> out = Vector<T>(ncol_);
+		out.fill(0);
+		T *out_ptr = nullptr;
+
+		// sum each row			
+		for (uint64_t i = 0; i < nrow_; ++i)
 		{
-			shape_[0] = nrow_;
-			shape_[1] = ncol_;
+			out_ptr = data_ + i * ncol_;
+
+			for (uint64_t j = 0; j < ncol_; ++j) {
+				out[j] += out_ptr[j];
+			}				
 		}
 
-		// init array and allocate memory
-		Array2D(uint32_t nrow, uint32_t ncol)
-		: nrow_(nrow), ncol_(ncol), size_(nrow * ncol){
-			shape_[0] = nrow_;
-			shape_[1] = ncol_;
-			data_ = new T[size_];
-		}
-
-		// init array from shape and allocate memory
-		Array2D(uint32_t shape[2])
-		: nrow_(shape[0]), ncol_(shape[1]), size_(nrow_ * ncol_){
-			shape_[0] = nrow_;
-			shape_[1] = ncol_;
-			data_ = new T[size_];
-		}
-
-		~Array2D(){delete data_;}
-		// force move constructor
-		Array2D(Array2D&&) = default;
-
-		// Get value at flattened index ix
-		T& operator[] (uint32_t ix){return data_[ix];}
-
-		// Get value at simulated (row, col)
-		T& operator() (uint32_t ix_row, uint32_t ix_col){
-			return data_[ix_row * ncol_ + ix_col];
-		}
-		// Return pointer to i'th row
-		T* row(uint32_t irow) {
-			return data_ + irow * ncol_;
-		}
-
-		// Return pointer to zeroth element
-		T* begin() {return data_;}
-		T* end() {return data_ + size_;}
-
-		Vector<T> mean_rows() {
-
-			Vector<T> out = Vector<T>(ncol_);
-			out.fill(0);
-			float *out_ptr = nullptr;
-
-			// sum each row			
-			for (uint32_t i = 0; i < nrow_; ++i)
-			{
-				out_ptr = data_ + i * ncol_;
-
-				for (uint32_t j = 0; j < ncol_; ++j) {
-					out[j] += out_ptr[j];
-				}				
+		// divide by nrow to get mean
+		for (uint64_t j = 0; j < ncol_; ++j) {
+				out[j] /= nrow_;
 			}
-			// divide by ncol to get mean
-			for (uint32_t j = 0; j < ncol_; ++j) {
-					out[j] /= ncol_;
-				}
-			return out;	
+
+		return out;	
+	}
+
+	void arange(T start, T stop, T step){
+		size_ = (stop - start) / step;
+
+		for (uint64_t i = 0; i < size_; ++i) {
+			data_[i] = start + i * step;			
 		}
+	}
 
-
-		void fill(T value){std::fill(data_, data_ + size_, value);}	
+	void fill(T value){std::fill(data_, data_ + size_, value);}	
 };
 
 
-struct Grid {
+class Grid {
+public:
 	// e.g (xmin, xmax, ymin, ymax, zmin, zmax)
 	std::array<float, 6> lims; 
 	// (dx, dy, dz)
@@ -144,11 +158,11 @@ struct Grid {
 	float xmin, ymin, zmin;
 	float x, y, z;
 	// float zmax = lims[5];
-	uint32_t nx, ny, nz;
-	uint32_t ix, iy, iz;
+	uint64_t nx, ny, nz;
+	uint64_t ix, iy, iz;
 	uint64_t npts;
 	uint64_t size;
-	// uint32_t size = 0;
+	// uint64_t size = 0;
 
 	Grid() {}
 	Grid(std::array<float, 6> lims, float spacing):
@@ -156,23 +170,42 @@ struct Grid {
 		nx = (lims[1] - lims[0]) / spacing;
 		ny = (lims[3] - lims[2]) / spacing;
 		nz = (lims[5] - lims[4]) / spacing;
-		npts = nx * ny * nz;
+		npts = (uint64_t) nx * ny * nz;
 		size = npts * 3;
 		printf("Grid (%u x %u x %u) = %lu\n", nx, ny, nz, npts);
 	}
 	~Grid(){}
 
+	// Array2D<float> build_points(){
+
+	// 	auto points = Array2D<float>(npts, 3);
+	// 	uint64_t ix = 0;		
+	// 	for (uint64_t i = 0; i < nz; ++i) {
+	// 		for (uint64_t j = 0; j < ny; ++j) {
+	// 			for (uint64_t k = 0; k < nx; ++k) {
+	// 				points.row(ix)[0] = xmin + k * spacing;
+	// 				points.row(ix)[1] = ymin + j * spacing;
+	// 				points.row(ix)[2] = zmin + i * spacing;
+	// 				ix++;
+	// 			}			
+	// 		}
+	// 	}
+	// 	return points;
+	// }
+
+
 	Array2D<float> build_points(){
 
 		auto points = Array2D<float>(npts, 3);
-		uint32_t ix = 0;
-		for (uint32_t i = 0; i < nz; ++i) {
-			for (uint32_t j = 0; j < ny; ++j) {
-				for (uint32_t k = 0; k < nx; ++k) {
-					points.row(ix)[0] = xmin + k * spacing;
-					points.row(ix)[1] = ymin + j * spacing;
-					points.row(ix)[2] = zmin + i * spacing;
-					ix++;
+		float* row_ix = points.data_;
+		
+		for (uint64_t i = 0; i < nz; ++i) {
+			for (uint64_t j = 0; j < ny; ++j) {
+				for (uint64_t k = 0; k < nx; ++k) {					
+					row_ix[0] = xmin + k * spacing;
+					row_ix[1] = ymin + j * spacing;
+					row_ix[2] = zmin + i * spacing;
+					row_ix += 3;
 				}			
 			}
 		}

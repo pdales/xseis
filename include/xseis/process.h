@@ -306,9 +306,11 @@ void norm_one_bit(float *sig, int npts)
 	}
 }
 
-bool abs_compare(int a, int b)
+// template<typename T>
+// bool abs_compare(T a, T b)
+bool abs_compare(float a, float b)
 {
-    return (std::abs(a) < std::abs(b));
+	return (std::abs(a) < std::abs(b));
 }
 
 void norm_max_abs(float *sig, int npts)
@@ -316,7 +318,7 @@ void norm_max_abs(float *sig, int npts)
 	float max = *std::max_element(sig, sig + npts, abs_compare);
 
 	if (max != 0){
-		for (int32_t i = 0; i < npts; ++i){
+		for (unsigned long i = 0; i < npts; ++i){
 			sig[i] /= max;
 		}
 	}

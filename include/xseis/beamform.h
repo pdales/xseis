@@ -29,8 +29,8 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 	#pragma omp parallel private(ixc, tts_sta1, tts_sta2, cc_ptr) num_threads(nthreads)
 	{
 		float *out_ptr = output.row(omp_get_thread_num());
-		printf("thread %u\n", omp_get_thread_num());
-		std::cout.flush();
+		// printf("thread %u\n", omp_get_thread_num());
+		// std::cout.flush();
 
 		// play around with loop scheduling here (later iterations should be slightly slower due to faster changin ckeys)
 		#pragma omp for
@@ -87,7 +87,7 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 
 	// compute velocity sampling rate
 	auto vsr = Vector<float>(vel_effective.size_);
-	for (int i = 0; i < vsr.size_; ++i)
+	for (uint32_t i = 0; i < vsr.size_; ++i)
 	{
 		vsr[i] = sr / vel_effective[i];
 	}
@@ -99,23 +99,55 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 	}
 
 	float dist;
-	float vsr_depth;
 	float *sloc = nullptr;
+	uint16_t *tt_row = nullptr;
 
-	for (uint32_t i = 0; i < ttable.nrow_; ++i)
+	for (uint32_t i = 0; i < nsta; ++i)
 	{
 		sloc = stalocs.row(i);
+		tt_row = ttable.row(i);
 
-		for (uint32_t j = 0; j < ttable.ncol_; ++j) 
+		for (uint32_t j = 0; j < ngrid; ++j) 
 		{	
 			dist = DistCartesian(sloc, gridlocs.row(j));
-			// vsr_depth = vsr[static_cast<uint16_t>(gridlocs(j, 2))];
-			ttable(i, j) = static_cast<uint16_t>(dist * vsr_grid[j] + 0.5);
+			tt_row[j] = static_cast<uint16_t>(dist * vsr_grid[j] + 0.5);
 		}
 	}
 
 	return ttable;
 }
+
+Vector<uint16_t> GetTravelTimes(float* staloc, Array2D<float>& gridlocs, Vector<float>& vel_effective, float sr)
+{
+	uint32_t ngrid = gridlocs.nrow_;
+	// uint32_t nsta = stalocs.nrow_;
+
+	auto tts = Vector<uint16_t>(ngrid);
+
+	// compute velocity sampling rate
+	auto vsr = Vector<float>(vel_effective.size_);
+	for (uint32_t i = 0; i < vsr.size_; ++i)
+	{
+		vsr[i] = sr / vel_effective[i];
+	}
+
+	auto vsr_grid = Vector<float>(ngrid);
+
+	for (uint32_t i = 0; i < ngrid; ++i){
+		vsr_grid[i] = vsr[static_cast<uint16_t>(gridlocs[i * 3 + 2])];
+	}
+
+	float dist;
+
+	for (uint32_t j = 0; j < ngrid; ++j) 
+	{	
+		dist = DistCartesian(staloc, gridlocs.row(j));
+		tts[j] = static_cast<uint16_t>(dist * vsr_grid[j] + 0.5);
+	}
+
+	return tts;
+}
+
 
 void tt_homo_ix(Array2D<float> &sta_locs, float *src_loc, float vsr, Vector<uint32_t> &tts)
 {	

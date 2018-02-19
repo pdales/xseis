@@ -53,15 +53,13 @@ struct Dataset {
 
 
 	Array2D<float> load_float_array() {
-		// hsize_t dim_flat[1] = {size_};
-		auto arr = Array2D<float>({(uint32_t) nrow_, (uint32_t) ncol_});
+		auto arr = Array2D<float>({(uint64_t) nrow_, (uint64_t) ncol_});
 		H5::DataSpace mspace(rank_, shape_);
 		dset_.read(arr.data_, dtype_, mspace, filespace_);
 		return arr;		
 		}
 
 	Vector<float> load_float_vector() {
-		// hsize_t dim_flat[1] = {size_};
 		auto vec = Vector<float>(nrow_);
 		H5::DataSpace mspace(1, shape_);
 		dset_.read(vec.data_, dtype_, mspace, filespace_);

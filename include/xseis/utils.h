@@ -133,7 +133,8 @@ void write(std::string fname, Array2D<T>& arr){
 	myfile.close();	
 }
 
-void WritePowerGrid(std::string fname, Vector<float>& pwr, Grid& grid){
+template <typename T>
+void WritePowerGrid(std::string fname, Vector<T>& pwr, Grid& grid){
 
 	std::ofstream myfile (fname);
 
@@ -144,7 +145,7 @@ void WritePowerGrid(std::string fname, Vector<float>& pwr, Grid& grid){
 	myfile << "\n";
 	myfile << grid.nz << " " << grid.ny << " " << grid.nx << "\n";
 
-	for (int i = 0; i < pwr.size_; ++i) {	
+	for (uint32_t i = 0; i < pwr.size_; ++i) {	
 		myfile << pwr[i] << " ";
 	}
 	myfile.close();	
@@ -199,7 +200,7 @@ template <typename T>
 void print_freq_sigs(T* fdata, int nsig, int npts){
 	for (int i = 0; i < nsig * npts; ++i) {
 		if (i % npts == 0){printf("\n");}
-			printf("[%.3f %.3fi] ", fdata[i][0], fdata[i][1]);
+			printf("[%.5f %.5fi] ", fdata[i][0], fdata[i][1]);
 	}
 	printf("\n");
 }
@@ -208,10 +209,10 @@ template <typename T>
 void PrintArraySize(Array2D<T>& arr){
 	// T val = arr[0];
 	float sizemb = (float) arr.size_ * sizeof(arr[0]) / (1024 * 1024);
-	// printf("(%u x %u) = %lu, %.1f mb (type: %s) \n", arr.nrow_, arr.ncol_,
-			 // arr.size_, sizemb,  typeid(arr[0]).name());
-	printf("(%u x %u), %.1f mb (%s) \n", arr.nrow_, arr.ncol_,
-			 sizemb,  typeid(arr[0]).name());
+	printf("(%u x %u) = %lu, %.1f mb (type: %s) \n", arr.nrow_, arr.ncol_,
+			 arr.size_, sizemb,  typeid(arr[0]).name());
+	// printf("(%u x %u), %.1f mb (%s) \n", arr.nrow_, arr.ncol_,
+			 // sizemb,  typeid(arr[0]).name());
 	// printf("type size %.1f bytes \n", (float) sizeof(arr[0]));
 }
 
