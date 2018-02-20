@@ -157,12 +157,20 @@ void apply_to_signals(Array2D<T>& arr, F* func, uint32_t nthreads)
 
 // }
 
-void whiten(float (*fdata)[2], int nfreq, float fsr, float fmin, float fmax, int len_taper)
+// void WhitenSpectrum(float (*fdata)[2], int nfreq, float fsr, float fmin, float fmax, int len_taper)
+void WhitenSpectrum(float (*fdata)[2], int nfreq, float sr, std::vector<float> filt_shape)
 {
-	// cutmin--porte1---porte2--cutmax
+	float fmin = filt_shape[0];
+	float fmax = filt_shape[1];
+	float len_taper_ratio = filt_shape[2];
+	// unsigned len_taper = len_taper_ratio * nfreq;
+	int len_taper = len_taper_ratio * nfreq;
+	// printf("ntaper %d\n", len_taper);
+
+	float fsr = (nfreq * 2 - 1) / sr;
+	// whiten corners:  cutmin--porte1---porte2--cutmax
 	int porte1 = fsr * fmin;
 	int porte2 = fsr * fmax;
-	// int nfreq = npts / 2 + 1;
 
 	int cutmin = std::max(porte1 - len_taper, 1);
 	int cutmax = std::min(porte2 + len_taper, nfreq);
@@ -174,20 +182,15 @@ void whiten(float (*fdata)[2], int nfreq, float fsr, float fmin, float fmax, int
 	int wlen = porte1 - cutmin;
 	float cosm = M_PI / (2. * wlen);
 
+	// whiten signal from cutmin to cutmax
+	for (int i = 0; i < cutmin; ++i) {
+		fdata[i][0] = 0.0;
+		fdata[i][1] = 0.0;
+	}
+
 	// left hand taper
 	for (int i = cutmin; i < porte1; ++i) {
 		amp = std::pow(std::cos((porte1 - (i + 1) ) * cosm), 2.0);
-		angle = std::atan2(fdata[i][1], fdata[i][0]);
-		fdata[i][0] = amp * std::cos(angle);
-		fdata[i][1] = amp * std::sin(angle);
-	}
-
-	wlen = cutmax - porte2;
-	cosm = M_PI / (2. * wlen);
-
-	// right hand taper
-	for (int i = porte2; i < cutmax; ++i) {
-		amp = std::pow(std::cos((i - porte2) * cosm), 2.0);
 		angle = std::atan2(fdata[i][1], fdata[i][0]);
 		fdata[i][0] = amp * std::cos(angle);
 		fdata[i][1] = amp * std::sin(angle);
@@ -200,11 +203,17 @@ void whiten(float (*fdata)[2], int nfreq, float fsr, float fmin, float fmax, int
 		fdata[i][1] = std::sin(angle);
 	}
 
-	for (int i = 0; i < cutmin; ++i) {
-		fdata[i][0] = 0.0;
-		fdata[i][1] = 0.0;
-	}
+	wlen = cutmax - porte2;
+	cosm = M_PI / (2. * wlen);
 
+	// right hand taper
+	for (int i = porte2; i < cutmax; ++i) {
+		amp = std::pow(std::cos((i - porte2) * cosm), 2.0);
+		angle = std::atan2(fdata[i][1], fdata[i][0]);
+		fdata[i][0] = amp * std::cos(angle);
+		fdata[i][1] = amp * std::sin(angle);
+	}
+	
 	for (int i = cutmax; i < nfreq; ++i) {
 		fdata[i][0] = 0.0;
 		fdata[i][1] = 0.0;

@@ -120,7 +120,7 @@ void print(Array2D<T> &arr){
 
 
 template <typename T>
-void write(std::string fname, Array2D<T>& arr){
+void Write(std::string fname, Array2D<T>& arr){
 	// std::cout.precision(10);
 	std::ofstream myfile (fname);
 
@@ -153,12 +153,23 @@ void WritePowerGrid(std::string fname, Vector<T>& pwr, Grid& grid){
 
 
 template <typename T>
-void write(std::string fname, Vector<T>& arr){
+void Write(std::string fname, Vector<T>& arr){
 	// std::cout.precision(10);
 	std::ofstream myfile (fname);
 
 	for (int i = 0; i < arr.size_; ++i) {	
 		myfile << arr[i] << "\n";
+	}
+	myfile.close();	
+}
+
+template <typename T>
+void Write(std::string fname, std::vector<T> vec){
+	// std::cout.precision(10);
+	std::ofstream myfile (fname);
+
+	for (int i = 0; i < vec.size(); ++i) {	
+		myfile << vec[i] << "\n";
 	}
 	myfile.close();	
 }
@@ -214,6 +225,25 @@ void PrintArraySize(Array2D<T>& arr){
 	// printf("(%u x %u), %.1f mb (%s) \n", arr.nrow_, arr.ncol_,
 			 // sizemb,  typeid(arr[0]).name());
 	// printf("type size %.1f bytes \n", (float) sizeof(arr[0]));
+}
+
+template <typename T>
+void PrintArraySize(Array2D<T>& arr, std::string tag){
+
+	float sizemb = (float) arr.size_ * sizeof(arr[0]) / (1024 * 1024);
+	// printf("---------%s-------------\n", tag);
+	std::cout << "\n" << tag << "--------------------------\n";
+	printf("(%u x %u) = %lu, %.1f mb (type: %s) \n", arr.nrow_, arr.ncol_,
+			 arr.size_, sizemb,  typeid(arr[0]).name());
+	// printf("(%u x %u), %.1f mb (%s) \n", arr.nrow_, arr.ncol_,
+			 // sizemb,  typeid(arr[0]).name());
+	// printf("type size %.1f bytes \n", (float) sizeof(arr[0]));
+}
+
+std::string ZeroPadInt(unsigned val, unsigned npad){
+	std::stringstream ss;
+	ss << std::setw(npad) << std::setfill('0') << val;
+	return ss.str();
 }
 
 }

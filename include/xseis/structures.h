@@ -111,7 +111,7 @@ public:
 	T* begin() {return data_;}
 	T* end() {return data_ + size_;}
 
-	Vector<T> mean_rows() {
+	Vector<T> sum_rows() {
 
 		Vector<T> out = Vector<T>(ncol_);
 		out.fill(0);
@@ -127,10 +127,10 @@ public:
 			}				
 		}
 
-		// divide by nrow to get mean
-		for (uint64_t j = 0; j < ncol_; ++j) {
-				out[j] /= nrow_;
-			}
+		// // divide by nrow to get mean
+		// for (uint64_t j = 0; j < ncol_; ++j) {
+		// 		out[j] /= nrow_;
+		// 	}
 
 		return out;	
 	}
@@ -149,8 +149,8 @@ public:
 
 class Grid {
 public:
-	// e.g (xmin, xmax, ymin, ymax, zmin, zmax)
-	std::array<float, 6> lims; 
+	// e.g (xmin, xmax, ymin, ymax, zmin, zmax, spacing)
+	std::vector<float> lims;
 	// (dx, dy, dz)
 	float spacing;
 
@@ -165,14 +165,14 @@ public:
 	// uint64_t size = 0;
 
 	Grid() {}
-	Grid(std::array<float, 6> lims, float spacing):
-	lims(lims), spacing(spacing), xmin(lims[0]), ymin(lims[2]), zmin(lims[4]){
+	Grid(std::vector<float> lims):
+	lims(lims), spacing(lims[6]), xmin(lims[0]), ymin(lims[2]), zmin(lims[4]){
 		nx = (lims[1] - lims[0]) / spacing;
 		ny = (lims[3] - lims[2]) / spacing;
 		nz = (lims[5] - lims[4]) / spacing;
 		npts = (uint64_t) nx * ny * nz;
 		size = npts * 3;
-		printf("Grid (%u x %u x %u) = %lu\n", nx, ny, nz, npts);
+		printf("Grid (%lu x %lu x %lu) = %lu\n", nx, ny, nz, npts);
 	}
 	~Grid(){}
 
@@ -237,21 +237,21 @@ public:
 		buf[2] = z;
 	}
 
-	std::array<float, 3> get_point(uint64_t index){
+	// std::vector<float, 3> get_point(uint64_t index){
 				
-		ix = index % nx;
-		iy = ((index - ix) / nx) % ny;
-		iz = index / (nx * ny);
+	// 	ix = index % nx;
+	// 	iy = ((index - ix) / nx) % ny;
+	// 	iz = index / (nx * ny);
 
-		x = ix * spacing + xmin;
-		y = iy * spacing + ymin;
-		z = iz * spacing + zmin;
-		std::array<float, 3> buf = {x, y, z};
-		return buf;
-		// buf[0] = x;
-		// buf[1] = y;
-		// buf[2] = z;
-	}
+	// 	x = ix * spacing + xmin;
+	// 	y = iy * spacing + ymin;
+	// 	z = iz * spacing + zmin;
+	// 	std::vector<float, 3> buf = {x, y, z};
+	// 	return buf;
+	// 	// buf[0] = x;
+	// 	// buf[1] = y;
+	// 	// buf[2] = z;
+	// }
 
 	
 };

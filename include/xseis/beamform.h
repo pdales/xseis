@@ -64,16 +64,21 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 
 	float vsr = sr / vel;
 	float dist;
+	float *sloc = nullptr;
+	uint16_t *tt_row = nullptr;
 
+	#pragma omp parallel for private(sloc, tt_row, dist)
 	for (uint32_t i = 0; i < ttable.nrow_; ++i)
 	{
+		sloc = stalocs.row(i);
+		tt_row = ttable.row(i);
+
 		for (uint32_t j = 0; j < ttable.ncol_; ++j) 
 		{
-			dist = DistCartesian(stalocs.row(i), gridlocs.row(j));			
-			ttable(i, j) = static_cast<uint16_t>(dist * vsr + 0.5);
+			dist = DistCartesian(sloc, gridlocs.row(j));			
+			tt_row[j] = static_cast<uint16_t>(dist * vsr + 0.5);
 		}
 	}
-
 	return ttable;
 }
 
@@ -117,7 +122,8 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 	return ttable;
 }
 
-Vector<uint16_t> GetTravelTimes(float* staloc, Array2D<float>& gridlocs, Vector<float>& vel_effective, float sr)
+
+Vector<uint16_t> GetTTOneToMany(float* staloc, Array2D<float>& gridlocs, Vector<float>& vel_effective, float sr)
 {
 	uint32_t ngrid = gridlocs.nrow_;
 	// uint32_t nsta = stalocs.nrow_;
@@ -143,6 +149,23 @@ Vector<uint16_t> GetTravelTimes(float* staloc, Array2D<float>& gridlocs, Vector<
 	{	
 		dist = DistCartesian(staloc, gridlocs.row(j));
 		tts[j] = static_cast<uint16_t>(dist * vsr_grid[j] + 0.5);
+	}
+
+	return tts;
+}
+
+
+Vector<uint16_t> GetTTOneToMany(float* loc, Array2D<float>& gridlocs, float vel, float sr)
+{
+	uint32_t ngrid = gridlocs.nrow_;
+	auto tts = Vector<uint16_t>(ngrid);
+	float vsr = sr / vel;
+	float dist;
+
+	for (uint32_t j = 0; j < ngrid; ++j) 
+	{	
+		dist = DistCartesian(loc, gridlocs.row(j));
+		tts[j] = static_cast<uint16_t>(dist * vsr + 0.5);
 	}
 
 	return tts;
