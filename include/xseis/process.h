@@ -45,7 +45,7 @@ void XCorrPairs(Array2D<fftwf_complex>& fdata, Array2D<uint16_t>& pairs, Array2D
 	uint32_t nfreq = fdata.ncol_;
 
 	#pragma omp for
-	for (uint32_t i = 0; i < pairs.nrow_; ++i)
+	for (uint64_t i = 0; i < pairs.nrow_; ++i)
 	{
 		XCorr(fdata.row(pairs(i, 0)), fdata.row(pairs(i, 1)),
 			 fdata_cc.row(i), nfreq);
@@ -158,6 +158,20 @@ void apply_to_signals(Array2D<T>& arr, F* func, uint32_t nthreads)
 // }
 
 // void WhitenSpectrum(float (*fdata)[2], int nfreq, float fsr, float fmin, float fmax, int len_taper)
+
+
+float energy_freq_domain(float (*sig)[2], int nfreq)
+{
+	float energy = 0;
+
+	for (int i = 0; i < nfreq; ++i) {
+		energy += sig[i][0] * sig[i][0] + sig[i][1] * sig[i][1];
+	}
+	// multiply by 2 for symmetry
+	return energy * 2;
+}
+
+
 void WhitenSpectrum(float (*fdata)[2], int nfreq, float sr, std::vector<float> filt_shape)
 {
 	float fmin = filt_shape[0];
@@ -219,6 +233,68 @@ void WhitenSpectrum(float (*fdata)[2], int nfreq, float sr, std::vector<float> f
 		fdata[i][1] = 0.0;
 	}
 }
+
+// void BuildWhitenFilter(unsigned nfreq, float sr, std::vector<float> filt_shape)
+// {
+// 	float fmin = filt_shape[0];
+// 	float fmax = filt_shape[1];
+// 	float len_taper_ratio = filt_shape[2];
+// 	unsigned len_taper = len_taper_ratio * nfreq;
+// 	// printf("ntaper %d\n", len_taper);
+
+// 	float fsr = (nfreq * 2 - 1) / sr;
+// 	// whiten corners:  cutmin--porte1---porte2--cutmax
+// 	unsigned porte1 = fsr * fmin;
+// 	unsigned porte2 = fsr * fmax;
+
+// 	int cutmin = std::max(porte1 - len_taper, 1);
+// 	int cutmax = std::min(porte2 + len_taper, nfreq);
+// 	float angle;
+// 	float amp;
+
+// 	// printf("%.8f fHz  %d npts_taper \n", fsr, npts_taper);
+// 	// printf("%d %d %d %d \n", cutmin, porte1, porte2, cutmax);
+// 	int wlen = porte1 - cutmin;
+// 	float cosm = M_PI / (2. * wlen);
+
+// 	// whiten signal from cutmin to cutmax
+// 	for (int i = 0; i < cutmin; ++i) {
+// 		fdata[i][0] = 0.0;
+// 		fdata[i][1] = 0.0;
+// 	}
+
+// 	// left hand taper
+// 	for (int i = cutmin; i < porte1; ++i) {
+// 		amp = std::pow(std::cos((porte1 - (i + 1) ) * cosm), 2.0);
+// 		angle = std::atan2(fdata[i][1], fdata[i][0]);
+// 		fdata[i][0] = amp * std::cos(angle);
+// 		fdata[i][1] = amp * std::sin(angle);
+// 	}
+
+// 	// setin middle freqs amp = 1
+// 	for (int i = porte1; i < porte2; ++i) {
+// 		angle = std::atan2(fdata[i][1], fdata[i][0]);
+// 		fdata[i][0] = std::cos(angle);
+// 		fdata[i][1] = std::sin(angle);
+// 	}
+
+// 	wlen = cutmax - porte2;
+// 	cosm = M_PI / (2. * wlen);
+
+// 	// right hand taper
+// 	for (int i = porte2; i < cutmax; ++i) {
+// 		amp = std::pow(std::cos((i - porte2) * cosm), 2.0);
+// 		angle = std::atan2(fdata[i][1], fdata[i][0]);
+// 		fdata[i][0] = amp * std::cos(angle);
+// 		fdata[i][1] = amp * std::sin(angle);
+// 	}
+	
+// 	for (int i = cutmax; i < nfreq; ++i) {
+// 		fdata[i][0] = 0.0;
+// 		fdata[i][1] = 0.0;
+// 	}
+// }
+
 
 void sliding_average(float *sig, int sig_len, int win_len)
 {
@@ -377,8 +453,6 @@ void norm_energy(float (*sig)[2], int npts)
 		sig[i][1] /= energy;
 	}
 }
-
-
 
 
 // void correlate_all_parallel(float (*fdata)[2], int nsig, int nfreq, float (*fdata_cc)[2], uint32_t *pairs, int npairs, int nthreads)

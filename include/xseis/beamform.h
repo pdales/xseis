@@ -15,41 +15,54 @@ inline float DistCartesian(float* a, float* b)
 	return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
+unsigned mod_floor(int a, int n) {
+	return ((a % n) + n) % n;
+}
+
+
 Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint16_t nthreads)
 {
 
-	uint32_t cclen = data_cc.ncol_;
+	const uint32_t cclen = data_cc.ncol_;
+	const uint32_t ncc = data_cc.nrow_;
+	const uint64_t ngrid = ttable.ncol_;
+
 	uint16_t ixc;
 	uint16_t *tts_sta1, *tts_sta2;
 	float *cc_ptr = nullptr;
 
-	auto output = Array2D<float>(nthreads, ttable.ncol_);
-	output.fill(0);
-
+	auto output = Array2D<float>(nthreads, ngrid);
+	uint32_t niter = 0;
 	#pragma omp parallel private(ixc, tts_sta1, tts_sta2, cc_ptr) num_threads(nthreads)
 	{
 		float *out_ptr = output.row(omp_get_thread_num());
-		// printf("thread %u\n", omp_get_thread_num());
-		// std::cout.flush();
-
+		std::fill(out_ptr, out_ptr + ngrid, 0);
 		// play around with loop scheduling here (later iterations should be slightly slower due to faster changin ckeys)
 		#pragma omp for
-		for (uint32_t i = 0; i < ckeys.nrow_; ++i)
+		for (uint32_t i = 0; i < ncc; ++i)
 		{
-			if (i % 10000 == 0) {			
-				printf("Prog: %.2f \r", ((float) i / ckeys.nrow_ * 100));
-				std::cout.flush();
-			}
+			// if (i % 10000 == 0) {
+			// 	printf("Prog: %.2f \r", ((float) i / ncc * 100));
+			// 	std::cout.flush();
+			// }
+
 			tts_sta1 = ttable.row(ckeys(i, 0));	
 			tts_sta2 = ttable.row(ckeys(i, 1));
 			cc_ptr = data_cc.row(i);
 
 			#pragma omp simd \
 			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
-			for (uint32_t j = 0; j < ttable.ncol_; ++j)
+			for (uint64_t j = 0; j < ngrid; ++j)
 			{
-				ixc = (tts_sta2[j] - tts_sta1[j]) % cclen;
-				out_ptr[j] += cc_ptr[ixc];
+
+				if (tts_sta2[j] >= tts_sta1[j])
+				{
+					out_ptr[j] += cc_ptr[tts_sta2[j] - tts_sta1[j]];					
+				}
+				else
+				{
+					out_ptr[j] += cc_ptr[cclen - tts_sta1[j] + tts_sta2[j]];
+				}
 			}
 		}
 	}	
@@ -107,6 +120,7 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 	float *sloc = nullptr;
 	uint16_t *tt_row = nullptr;
 
+	#pragma omp parallel for private(sloc, tt_row, dist)
 	for (uint32_t i = 0; i < nsta; ++i)
 	{
 		sloc = stalocs.row(i);
@@ -123,48 +137,47 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 }
 
 
-Vector<uint16_t> GetTTOneToMany(float* staloc, Array2D<float>& gridlocs, Vector<float>& vel_effective, float sr)
+// Vector<uint16_t> GetTTSourceToStations(float* src, Array2D<float>& stalocs, Vector<float>& vel_effective, float sr)
+// {
+
+// 	uint32_t nsta = stalocs.nrow_;
+// 	auto tts = Vector<uint16_t>(nsta);
+
+// 	// compute velocity sampling rate
+// 	auto vsr = Vector<float>(vel_effective.size_);
+// 	for (uint32_t i = 0; i < vsr.size_; ++i)
+// 	{
+// 		vsr[i] = sr / vel_effective[i];
+// 	}
+
+// 	auto vsr_grid = Vector<float>(ngrid);
+
+// 	for (uint32_t i = 0; i < ngrid; ++i){
+// 		vsr_grid[i] = vsr[static_cast<uint16_t>(gridlocs[i * 3 + 2])];
+// 	}
+
+// 	float dist;
+
+// 	for (uint32_t j = 0; j < ngrid; ++j) 
+// 	{	
+// 		dist = DistCartesian(staloc, gridlocs.row(j));
+// 		tts[j] = static_cast<uint16_t>(dist * vsr_grid[j] + 0.5);
+// 	}
+
+// 	return tts;
+// }
+
+
+Vector<uint16_t> GetTTOneToMany(float* loc_src, Array2D<float>& locs, float vel, float sr)
 {
-	uint32_t ngrid = gridlocs.nrow_;
-	// uint32_t nsta = stalocs.nrow_;
-
-	auto tts = Vector<uint16_t>(ngrid);
-
-	// compute velocity sampling rate
-	auto vsr = Vector<float>(vel_effective.size_);
-	for (uint32_t i = 0; i < vsr.size_; ++i)
-	{
-		vsr[i] = sr / vel_effective[i];
-	}
-
-	auto vsr_grid = Vector<float>(ngrid);
-
-	for (uint32_t i = 0; i < ngrid; ++i){
-		vsr_grid[i] = vsr[static_cast<uint16_t>(gridlocs[i * 3 + 2])];
-	}
-
-	float dist;
-
-	for (uint32_t j = 0; j < ngrid; ++j) 
-	{	
-		dist = DistCartesian(staloc, gridlocs.row(j));
-		tts[j] = static_cast<uint16_t>(dist * vsr_grid[j] + 0.5);
-	}
-
-	return tts;
-}
-
-
-Vector<uint16_t> GetTTOneToMany(float* loc, Array2D<float>& gridlocs, float vel, float sr)
-{
-	uint32_t ngrid = gridlocs.nrow_;
-	auto tts = Vector<uint16_t>(ngrid);
+	uint32_t nlocs = locs.nrow_;
+	auto tts = Vector<uint16_t>(nlocs);
 	float vsr = sr / vel;
 	float dist;
 
-	for (uint32_t j = 0; j < ngrid; ++j) 
+	for (uint32_t j = 0; j < nlocs; ++j) 
 	{	
-		dist = DistCartesian(loc, gridlocs.row(j));
+		dist = DistCartesian(loc_src, locs.row(j));
 		tts[j] = static_cast<uint16_t>(dist * vsr + 0.5);
 	}
 
@@ -325,6 +338,90 @@ void search_grid_parallel(std::vector<uint32_t>& parts, Array2D<float>& data, Ar
 
 	for(auto& thread : pool) thread.join();
 }
+
+
+uint64_t factorial(uint64_t n)
+{
+	uint64_t ret = 1;
+	for(uint64_t i = 1; i <= n; ++i)
+		ret *= i;
+	return ret;
+}
+
+uint64_t NChoose2(uint64_t n)
+{
+	return (n * (n-1)) / 2;
+}
+
+
+
+Array2D<uint16_t> unique_pairs(Vector<uint16_t>& keys)
+{
+	uint64_t npair = 0;
+
+	// crude way to calc nkeys (wil use dist filters later)
+	for (unsigned i = 0; i < keys.size_; ++i)
+	{
+		for (unsigned j = i + 1; j < keys.size_; ++j)
+		{
+			npair += 1;			
+		}
+	}
+
+	auto ckeys = Array2D<uint16_t>(npair, 2);
+	uint64_t row_ix = 0;
+
+	for (unsigned i = 0; i < keys.size_; ++i)
+	{
+		for (unsigned j = i + 1; j < keys.size_; ++j)
+		{
+			ckeys(row_ix, 0) = keys[i];
+			ckeys(row_ix, 1) = keys[j];
+			row_ix += 1;
+		}
+	}
+	return ckeys;
+}
+
+Array2D<uint16_t> BuildPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist)
+{
+	// uint64_t npair = 0;
+	uint64_t npair_max = NChoose2(keys.size_);
+	printf("max pairs %lu\n", npair_max);
+	auto ckeys = Array2D<uint16_t>(npair_max, 2);
+	uint64_t row_ix = 0;
+	float dist;
+	float* loc1 = nullptr;
+	float* loc2 = nullptr;
+	
+	for (unsigned i = 0; i < keys.size_; ++i)
+	{
+		loc1 = stalocs.row(keys[i]);
+
+		for (unsigned j = i + 1; j < keys.size_; ++j)
+		{
+			loc2 = stalocs.row(keys[j]);
+			dist = DistCartesian(loc1, loc2);
+			// printf("[%u,%u] %.2f \n",i, j, dist);
+			if (dist > min_dist)
+			{
+				// printf("%u\n", row_ix);
+				ckeys(row_ix, 0) = keys[i];
+				ckeys(row_ix, 1) = keys[j];
+				row_ix += 1;
+			}			
+		}
+	}
+
+	auto ckeys2 = Array2D<uint16_t>(row_ix, 2);
+	for(unsigned i = 0; i < ckeys2.size_; ++i) {
+		ckeys2[i] = ckeys[i];
+	}
+
+	return ckeys2;
+}
+
+
 
 }
 

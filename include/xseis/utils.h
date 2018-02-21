@@ -9,34 +9,6 @@
 
 namespace utils {
 
-Array2D<uint16_t> unique_pairs(Vector<uint16_t>& keys)
-{
-	uint64_t npair = 0;
-
-	// crude way to calc nkeys (wil use dist filters later)
-	for (int i = 0; i < keys.size_; ++i)
-	{
-		for (int j = i + 1; j < keys.size_; ++j)
-		{
-			npair += 1;			
-		}
-	}
-
-	auto ckeys = Array2D<uint16_t>(npair, 2);
-	uint64_t row_ix = 0;
-
-	for (int i = 0; i < keys.size_; ++i)
-	{
-		for (int j = i + 1; j < keys.size_; ++j)
-		{
-			ckeys(row_ix, 0) = keys[i];
-			ckeys(row_ix, 1) = keys[j];
-			row_ix += 1;
-		}
-	}
-	return ckeys;
-}
-
 
 std::vector<uint32_t> gen_equal_parts(uint32_t ntot, uint32_t nthread) 
 {
@@ -103,12 +75,12 @@ void print(Array2D<T> &arr){
 	int wraplen = 0;
 	int trunc = 20;
 
-	for (int i = 0; i < arr.nrow_; ++i)
+	for (unsigned i = 0; i < arr.nrow_; ++i)
 	{	
 		printf("[");		
 		if (i > trunc) {printf("..\n"); break;}
 
-		for (int j = 0; j < arr.ncol_; ++j)
+		for (unsigned j = 0; j < arr.ncol_; ++j)
 		{
 			if (j > trunc) {printf("..\n"); break;}
 			std::cout << arr(i, j) << " ";
@@ -145,7 +117,7 @@ void WritePowerGrid(std::string fname, Vector<T>& pwr, Grid& grid){
 	myfile << "\n";
 	myfile << grid.nz << " " << grid.ny << " " << grid.nx << "\n";
 
-	for (uint32_t i = 0; i < pwr.size_; ++i) {	
+	for (uint64_t i = 0; i < pwr.size_; ++i) {	
 		myfile << pwr[i] << " ";
 	}
 	myfile.close();	

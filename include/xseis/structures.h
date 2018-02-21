@@ -81,6 +81,14 @@ public:
 		data_ = new T[size_];
 	}
 
+	// void resize_rows(uint64_t nrow_new) {
+
+	// if(void* mem = std::realloc(data_, nrow_new * ncol_))
+	// 	data_ = static_cast<char*>(mem);
+	// else
+	// 	throw std::bad_alloc();
+ //        }
+
 	// // init array from shape and allocate memory
 	// Array2D(uint64_t shape[2])
 	// : nrow_(shape[0]), ncol_(shape[1]), size_(nrow_ * ncol_){
