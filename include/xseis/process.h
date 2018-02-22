@@ -234,66 +234,69 @@ void WhitenSpectrum(float (*fdata)[2], int nfreq, float sr, std::vector<float> f
 	}
 }
 
-// void BuildWhitenFilter(unsigned nfreq, float sr, std::vector<float> filt_shape)
-// {
-// 	float fmin = filt_shape[0];
-// 	float fmax = filt_shape[1];
-// 	float len_taper_ratio = filt_shape[2];
-// 	unsigned len_taper = len_taper_ratio * nfreq;
-// 	// printf("ntaper %d\n", len_taper);
+Vector<float> BuildWhitenFilter(std::vector<float>& corner_freqs, unsigned nfreq, float sr)
+{
 
-// 	float fsr = (nfreq * 2 - 1) / sr;
-// 	// whiten corners:  cutmin--porte1---porte2--cutmax
-// 	unsigned porte1 = fsr * fmin;
-// 	unsigned porte2 = fsr * fmax;
+	float fsr = (nfreq * 2 - 1) / sr;
+	printf("nfreq: %u, FSR: %.4f\n", nfreq, fsr);
 
-// 	int cutmin = std::max(porte1 - len_taper, 1);
-// 	int cutmax = std::min(porte2 + len_taper, nfreq);
-// 	float angle;
-// 	float amp;
+	std::vector<uint32_t> cx;
+	for(auto&& cf : corner_freqs) {
+		cx.push_back(static_cast<uint32_t>(cf * fsr + 0.5));
+		// printf("cf/fsr %.2f, %.5f\n", cf, fsr);
+	}
+	printf("filt corner indexes \n");
+	for(auto&& c : cx) {
+		// printf("cx/ cast: %.3f, %u\n", cx, (uint32_t)cx);
+		printf("--%u--", c);
+	}
+	printf("\n");
 
-// 	// printf("%.8f fHz  %d npts_taper \n", fsr, npts_taper);
-// 	// printf("%d %d %d %d \n", cutmin, porte1, porte2, cutmax);
-// 	int wlen = porte1 - cutmin;
-// 	float cosm = M_PI / (2. * wlen);
+	// whiten corners:  cutmin--porte1---porte2--cutmax
+	auto filter = Vector<float>(nfreq);
+	filter.fill(0);
 
-// 	// whiten signal from cutmin to cutmax
-// 	for (int i = 0; i < cutmin; ++i) {
-// 		fdata[i][0] = 0.0;
-// 		fdata[i][1] = 0.0;
-// 	}
+	// int wlen = porte1 - cutmin;
+	float cosm_left = M_PI / (2. * (cx[1] - cx[0]));
+	// left hand taper
+	for (unsigned i = cx[0]; i < cx[1]; ++i) {
+		filter[i] = std::pow(std::cos((cx[1] - (i + 1) ) * cosm_left), 2.0);
+	}
 
-// 	// left hand taper
-// 	for (int i = cutmin; i < porte1; ++i) {
-// 		amp = std::pow(std::cos((porte1 - (i + 1) ) * cosm), 2.0);
-// 		angle = std::atan2(fdata[i][1], fdata[i][0]);
-// 		fdata[i][0] = amp * std::cos(angle);
-// 		fdata[i][1] = amp * std::sin(angle);
-// 	}
+	// setin middle freqs amp = 1
+	for (unsigned i = cx[1]; i < cx[2]; ++i) {
+		filter[i] = 1;
+	}
 
-// 	// setin middle freqs amp = 1
-// 	for (int i = porte1; i < porte2; ++i) {
-// 		angle = std::atan2(fdata[i][1], fdata[i][0]);
-// 		fdata[i][0] = std::cos(angle);
-// 		fdata[i][1] = std::sin(angle);
-// 	}
+	float cosm_right = M_PI / (2. * (cx[3] - cx[2]));
 
-// 	wlen = cutmax - porte2;
-// 	cosm = M_PI / (2. * wlen);
+	// right hand taper
+	for (unsigned i = cx[2]; i < cx[3]; ++i) {
+		filter[i] = std::pow(std::cos((i - cx[2]) * cosm_right), 2.0);
+	}
 
-// 	// right hand taper
-// 	for (int i = porte2; i < cutmax; ++i) {
-// 		amp = std::pow(std::cos((i - porte2) * cosm), 2.0);
-// 		angle = std::atan2(fdata[i][1], fdata[i][0]);
-// 		fdata[i][0] = amp * std::cos(angle);
-// 		fdata[i][1] = amp * std::sin(angle);
-// 	}
-	
-// 	for (int i = cutmax; i < nfreq; ++i) {
-// 		fdata[i][0] = 0.0;
-// 		fdata[i][1] = 0.0;
-// 	}
-// }
+	return filter;	
+
+}
+
+void ApplyWhitenFilter(float (*fdata)[2], unsigned nfreq, Vector<float>& filter)
+{
+	float angle;
+
+	for (unsigned i = 0; i < filter.size_; ++i)
+	{
+		if(filter[i] == 0) {
+			fdata[i][0] = 0;
+			fdata[i][1] = 0;
+		}
+		else {
+			angle = std::atan2(fdata[i][1], fdata[i][0]);
+			fdata[i][0] = filter[i] * std::cos(angle);
+			fdata[i][1] = filter[i] * std::sin(angle);
+		}		
+	}
+
+}
 
 
 void sliding_average(float *sig, int sig_len, int win_len)

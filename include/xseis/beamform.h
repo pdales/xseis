@@ -50,11 +50,13 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 			tts_sta2 = ttable.row(ckeys(i, 1));
 			cc_ptr = data_cc.row(i);
 
+			// Migrate single ccf on to grid based on tt difference
 			#pragma omp simd \
 			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
 			for (uint64_t j = 0; j < ngrid; ++j)
 			{
-
+				// Get appropriate ix of unrolled ccfs (same as mod_floor)
+				// by wrapping negative traveltime differences
 				if (tts_sta2[j] >= tts_sta1[j])
 				{
 					out_ptr[j] += cc_ptr[tts_sta2[j] - tts_sta1[j]];					
@@ -70,7 +72,7 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 }
 
 
-
+// Uses constant velocity medium
 Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, float vel, float sr)
 {
 	auto ttable = Array2D<uint16_t>(stalocs.nrow_, gridlocs.nrow_);
@@ -96,6 +98,7 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 }
 
 
+// Uses 1D (depth) model specified in vel_effective (1 value per meter)
 Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, Vector<float>& vel_effective, float sr)
 {
 	uint32_t ngrid = gridlocs.nrow_;
@@ -135,37 +138,6 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 
 	return ttable;
 }
-
-
-// Vector<uint16_t> GetTTSourceToStations(float* src, Array2D<float>& stalocs, Vector<float>& vel_effective, float sr)
-// {
-
-// 	uint32_t nsta = stalocs.nrow_;
-// 	auto tts = Vector<uint16_t>(nsta);
-
-// 	// compute velocity sampling rate
-// 	auto vsr = Vector<float>(vel_effective.size_);
-// 	for (uint32_t i = 0; i < vsr.size_; ++i)
-// 	{
-// 		vsr[i] = sr / vel_effective[i];
-// 	}
-
-// 	auto vsr_grid = Vector<float>(ngrid);
-
-// 	for (uint32_t i = 0; i < ngrid; ++i){
-// 		vsr_grid[i] = vsr[static_cast<uint16_t>(gridlocs[i * 3 + 2])];
-// 	}
-
-// 	float dist;
-
-// 	for (uint32_t j = 0; j < ngrid; ++j) 
-// 	{	
-// 		dist = DistCartesian(staloc, gridlocs.row(j));
-// 		tts[j] = static_cast<uint16_t>(dist * vsr_grid[j] + 0.5);
-// 	}
-
-// 	return tts;
-// }
 
 
 Vector<uint16_t> GetTTOneToMany(float* loc_src, Array2D<float>& locs, float vel, float sr)

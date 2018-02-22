@@ -51,6 +51,22 @@ public:
 			data_[i] *= value;
 		}
 	}
+
+	T sum(){
+		T total = 0;
+		for (uint64_t i = 0; i < size_; ++i) {
+			total += data_[i];
+		}
+		return total;
+	}
+
+	T energy(){
+		T total = 0;
+		for (uint64_t i = 0; i < size_; ++i) {
+			total += data_[i] * data_[i];
+		}
+		return total;
+	}
 	
 };
 
