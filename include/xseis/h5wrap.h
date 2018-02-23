@@ -75,6 +75,26 @@ struct Dataset {
 
 		H5::DataSpace mspace(2, count);
 		dset_.read(arr.data_, dtype_, mspace, filespace_);
+		}
+
+	template <typename T>	
+	void LoadRows(Array2D<T>& arr, Vector<uint16_t>& keys, hsize_t col_offset) {
+
+		if(arr.nrow_ != keys.size_) {
+			printf("WARNING nrows does not match buffer: %lu != %lu\n", arr.nrow_, keys.size_);
+		}
+		// Define slab size
+		hsize_t count[2] = {1, arr.ncol_};
+		hsize_t offset[2] = {0, col_offset};
+		H5::DataSpace mspace(2, count);
+
+		for(uint64_t i = 0; i < keys.size_; ++i) {
+			offset[0] = keys[i];
+			filespace_.selectHyperslab(H5S_SELECT_SET, count, offset);
+			dset_.read(arr.row(i), dtype_, mspace, filespace_);			
+		}
+
+		
 		}	
 };
 

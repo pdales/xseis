@@ -3,6 +3,7 @@
 
 #include "xseis/process.h"
 #include "xseis/structures.h"
+#include <random>
 
 
 namespace beamform {
@@ -355,7 +356,7 @@ Array2D<uint16_t> unique_pairs(Vector<uint16_t>& keys)
 	return ckeys;
 }
 
-Array2D<uint16_t> BuildPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist)
+Array2D<uint16_t> BuildPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist)
 {
 	// uint64_t npair = 0;
 	uint64_t npair_max = NChoose2(keys.size_);
@@ -375,7 +376,7 @@ Array2D<uint16_t> BuildPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& sta
 			loc2 = stalocs.row(keys[j]);
 			dist = DistCartesian(loc1, loc2);
 			// printf("[%u,%u] %.2f \n",i, j, dist);
-			if (dist > min_dist)
+			if (dist > min_dist && dist < max_dist)
 			{
 				// printf("%u\n", row_ix);
 				ckeys(row_ix, 0) = keys[i];
@@ -391,6 +392,39 @@ Array2D<uint16_t> BuildPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& sta
 	}
 
 	return ckeys2;
+}
+
+Array2D<uint16_t> BuildNPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist, unsigned ncc)
+{
+	auto ckeys = Array2D<uint16_t>(ncc, 2);
+	
+	std::mt19937::result_type seed = time(0);
+	auto rand_int = std::bind(std::uniform_int_distribution<unsigned>(0, keys.size_), std::mt19937(seed));
+
+	uint16_t k1, k2; 
+	float dist;
+	float* loc1 = nullptr;
+	float* loc2 = nullptr;
+
+	unsigned i = 0;
+	while(i < ncc) {
+		k1 = rand_int();
+		k2 = rand_int();
+		if(k1 != k2) {
+			loc1 = stalocs.row(keys[k1]);
+			loc2 = stalocs.row(keys[k2]);
+			dist = DistCartesian(loc1, loc2);
+			// printf("[%u,%u] %.2f \n",i, j, dist);
+			if (dist > min_dist && dist < max_dist)
+			{	
+				ckeys.row(i)[0] = keys[k1];
+				ckeys.row(i)[1] = keys[k2];
+				i++;
+			}
+		}
+	}
+	
+	return ckeys;
 }
 
 

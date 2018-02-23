@@ -458,6 +458,25 @@ void norm_energy(float (*sig)[2], int npts)
 }
 
 
+template<typename T>
+float standard_deviation(T *data, uint64_t size) {
+
+	float mean = 0;
+	for(uint64_t i = 0; i < size; ++i) {
+		mean += data[i];
+	}
+	mean /= size;
+
+	float var = 0;
+	for(uint64_t i = 0; i < size; ++i) {
+		var += (data[i] - mean) * (data[i] - mean);
+	}
+
+	var /= size;
+	return std::sqrt(var);
+}
+
+
 // void correlate_all_parallel(float (*fdata)[2], int nsig, int nfreq, float (*fdata_cc)[2], uint32_t *pairs, int npairs, int nthreads)
 // {
 // 	std::vector<std::thread> pool;

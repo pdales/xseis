@@ -5,9 +5,39 @@
 #include <iomanip>
 #include <numeric>
 #include <typeinfo>
+#include <random>
 #include "xseis/structures.h"
 
 namespace utils {
+
+
+// Set first N elements of array with randomly chosen elements
+template<class BidiIter >
+void random_unique(BidiIter begin, BidiIter end, size_t num_random) {
+	size_t left = std::distance(begin, end);
+	while (num_random--) {
+		BidiIter r = begin;
+		std::advance(r, rand()%left);
+		std::swap(*begin, *r);
+		++begin;
+		--left;
+	}
+}
+
+
+// std::mt19937 get_prng() {
+// 	std::random_device r;
+// 	std::seed_seq seed{r(), r(), r(), r(), r(), r(), r(), r()};
+// 	return std::mt19937(seed);
+// }
+
+// 	std::uniform_real_distribution<float> drange_x(limits[0], limits[3]);
+// 	std::uniform_real_distribution<float> drange_y(limits[1], limits[4]);
+// 	std::uniform_real_distribution<float> drange_z(limits[2], limits[5]);
+
+// 	std::array<float, 3> curr_coord;
+// 	curr_coord = {drange_x(e2), drange_y(e2), drange_z(e2)};
+
 
 
 std::vector<uint32_t> gen_equal_parts(uint32_t ntot, uint32_t nthread) 
