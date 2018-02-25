@@ -53,7 +53,7 @@ struct Dataset {
 
 
 	Array2D<float> load_float_array() {
-		auto arr = Array2D<float>({(uint64_t) nrow_, (uint64_t) ncol_});
+		auto arr = Array2D<float>({(size_t) nrow_, (size_t) ncol_});
 		H5::DataSpace mspace(rank_, shape_);
 		dset_.read(arr.data_, dtype_, mspace, filespace_);
 		return arr;		
@@ -88,7 +88,7 @@ struct Dataset {
 		hsize_t offset[2] = {0, col_offset};
 		H5::DataSpace mspace(2, count);
 
-		for(uint64_t i = 0; i < keys.size_; ++i) {
+		for(size_t i = 0; i < keys.size_; ++i) {
 			offset[0] = keys[i];
 			filespace_.selectHyperslab(H5S_SELECT_SET, count, offset);
 			dset_.read(arr.row(i), dtype_, mspace, filespace_);			

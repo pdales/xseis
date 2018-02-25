@@ -16,31 +16,31 @@ inline float DistCartesian(float* a, float* b)
 	return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-unsigned mod_floor(int a, int n) {
+uint mod_floor(int a, int n) {
 	return ((a % n) + n) % n;
 }
 
 
+// Each thread given own output buffer to prevent cache invalidations
 Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint16_t nthreads)
 {
 
-	const uint32_t cclen = data_cc.ncol_;
-	const uint32_t ncc = data_cc.nrow_;
-	const uint64_t ngrid = ttable.ncol_;
+	const size_t cclen = data_cc.ncol_;
+	const size_t ncc = data_cc.nrow_;
+	const size_t ngrid = ttable.ncol_;
 
-	uint16_t ixc;
 	uint16_t *tts_sta1, *tts_sta2;
 	float *cc_ptr = nullptr;
 
 	auto output = Array2D<float>(nthreads, ngrid);
-	uint32_t niter = 0;
-	#pragma omp parallel private(ixc, tts_sta1, tts_sta2, cc_ptr) num_threads(nthreads)
+	size_t niter = 0;
+	#pragma omp parallel private(tts_sta1, tts_sta2, cc_ptr) num_threads(nthreads)
 	{
 		float *out_ptr = output.row(omp_get_thread_num());
 		std::fill(out_ptr, out_ptr + ngrid, 0);
-		// play around with loop scheduling here (later iterations should be slightly slower due to faster changin ckeys)
+		// play around with loop scheduling here (later iterations should be slightly slower due to faster  changin ckeys)
 		#pragma omp for
-		for (uint32_t i = 0; i < ncc; ++i)
+		for (size_t i = 0; i < ncc; ++i)
 		{
 			// if (i % 10000 == 0) {
 			// 	printf("Prog: %.2f \r", ((float) i / ncc * 100));
@@ -54,7 +54,7 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 			// Migrate single ccf on to grid based on tt difference
 			#pragma omp simd \
 			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
-			for (uint64_t j = 0; j < ngrid; ++j)
+			for (size_t j = 0; j < ngrid; ++j)
 			{
 				// Get appropriate ix of unrolled ccfs (same as mod_floor)
 				// by wrapping negative traveltime differences
@@ -72,6 +72,66 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 	return output;
 }
 
+// Divide grid into chunks to prevent cache invalidations in writing (see Ben Baker migrate)
+// This is consumes less memory
+Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint nthreads, size_t blocksize)
+{
+
+	const size_t cclen = data_cc.ncol_;
+	const size_t ncc = data_cc.nrow_;
+	const size_t ngrid = ttable.ncol_;
+	size_t blocklen;
+
+	uint16_t *tts_sta1, *tts_sta2;
+	float *cc_ptr = nullptr;
+	float *out_ptr = nullptr;
+
+	auto output = Vector<float>(ngrid);
+	output.fill(0);
+
+	printf("blocksize %lu, ngrid %lu \n", blocksize, ngrid);
+
+	#pragma omp parallel for private(tts_sta1, tts_sta2, cc_ptr, out_ptr, blocklen) num_threads(nthreads)
+	for(size_t iblock = 0; iblock < ngrid; iblock += blocksize) {
+	// for(size_t iblock = 0; iblock < ngrid / blocklen; ++iblock) {
+
+		blocklen = std::min(ngrid - iblock, blocksize);
+		// std::cout << iblock << ", len: ";
+		// std::cout << blocklen << '\n';
+
+		out_ptr = output.data_ + iblock;
+		// out_ptr = output.data_ + iblock * blocklen;
+		// std::fill(out_ptr, out_ptr + blocklen, 0);
+		
+		for (size_t i = 0; i < ncc; ++i)
+		{				
+			tts_sta1 = ttable.row(ckeys(i, 0)) + iblock;	
+			tts_sta2 = ttable.row(ckeys(i, 1)) + iblock;
+			cc_ptr = data_cc.row(i);
+
+			// Migrate single ccf on to grid based on tt difference
+			#pragma omp simd \
+			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+			for (size_t j = 0; j < blocklen; ++j)
+			{
+				// Get appropriate ix of unrolled ccfs (same as mod_floor)
+				// by wrapping negative traveltime differences
+				if (tts_sta2[j] >= tts_sta1[j])
+				{
+					out_ptr[j] += cc_ptr[tts_sta2[j] - tts_sta1[j]];					
+				}
+				else
+				{
+					out_ptr[j] += cc_ptr[cclen - tts_sta1[j] + tts_sta2[j]];
+				}
+			}
+		}
+
+	}
+	// printf("completed\n");	
+	return output;
+}
+
 
 // Uses constant velocity medium
 Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, float vel, float sr)
@@ -84,12 +144,12 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 	uint16_t *tt_row = nullptr;
 
 	#pragma omp parallel for private(sloc, tt_row, dist)
-	for (uint32_t i = 0; i < ttable.nrow_; ++i)
+	for (size_t i = 0; i < ttable.nrow_; ++i)
 	{
 		sloc = stalocs.row(i);
 		tt_row = ttable.row(i);
 
-		for (uint32_t j = 0; j < ttable.ncol_; ++j) 
+		for (size_t j = 0; j < ttable.ncol_; ++j) 
 		{
 			dist = DistCartesian(sloc, gridlocs.row(j));			
 			tt_row[j] = static_cast<uint16_t>(dist * vsr + 0.5);
@@ -102,21 +162,21 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 // Uses 1D (depth) model specified in vel_effective (1 value per meter)
 Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, Vector<float>& vel_effective, float sr)
 {
-	uint32_t ngrid = gridlocs.nrow_;
-	uint32_t nsta = stalocs.nrow_;
+	size_t ngrid = gridlocs.nrow_;
+	size_t nsta = stalocs.nrow_;
 
 	auto ttable = Array2D<uint16_t>(nsta, ngrid);
 
 	// compute velocity sampling rate
 	auto vsr = Vector<float>(vel_effective.size_);
-	for (uint32_t i = 0; i < vsr.size_; ++i)
+	for (size_t i = 0; i < vsr.size_; ++i)
 	{
 		vsr[i] = sr / vel_effective[i];
 	}
 
 	auto vsr_grid = Vector<float>(ngrid);
 
-	for (uint32_t i = 0; i < ngrid; ++i){
+	for (size_t i = 0; i < ngrid; ++i){
 		vsr_grid[i] = vsr[static_cast<uint16_t>(gridlocs[i * 3 + 2])];
 	}
 
@@ -125,12 +185,12 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 	uint16_t *tt_row = nullptr;
 
 	#pragma omp parallel for private(sloc, tt_row, dist)
-	for (uint32_t i = 0; i < nsta; ++i)
+	for (size_t i = 0; i < nsta; ++i)
 	{
 		sloc = stalocs.row(i);
 		tt_row = ttable.row(i);
 
-		for (uint32_t j = 0; j < ngrid; ++j) 
+		for (size_t j = 0; j < ngrid; ++j) 
 		{	
 			dist = DistCartesian(sloc, gridlocs.row(j));
 			tt_row[j] = static_cast<uint16_t>(dist * vsr_grid[j] + 0.5);
@@ -143,12 +203,12 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 
 Vector<uint16_t> GetTTOneToMany(float* loc_src, Array2D<float>& locs, float vel, float sr)
 {
-	uint32_t nlocs = locs.nrow_;
+	size_t nlocs = locs.nrow_;
 	auto tts = Vector<uint16_t>(nlocs);
 	float vsr = sr / vel;
 	float dist;
 
-	for (uint32_t j = 0; j < nlocs; ++j) 
+	for (size_t j = 0; j < nlocs; ++j) 
 	{	
 		dist = DistCartesian(loc_src, locs.row(j));
 		tts[j] = static_cast<uint16_t>(dist * vsr + 0.5);
@@ -158,12 +218,12 @@ Vector<uint16_t> GetTTOneToMany(float* loc_src, Array2D<float>& locs, float vel,
 }
 
 
-void tt_homo_ix(Array2D<float> &sta_locs, float *src_loc, float vsr, Vector<uint32_t> &tts)
+void tt_homo_ix(Array2D<float> &sta_locs, float *src_loc, float vsr, Vector<size_t> &tts)
 {	
 	float dist;
-	for (uint32_t j = 0; j < tts.size_; ++j) {
+	for (size_t j = 0; j < tts.size_; ++j) {
 		dist = beamform::DistCartesian(src_loc, sta_locs.row(j));
-		tts[j] = static_cast<uint32_t>(dist * vsr + 0.5);
+		tts[j] = static_cast<size_t>(dist * vsr + 0.5);
 	}
 }
 
@@ -250,20 +310,20 @@ void beampower_homo(Array2D<float> &points, Vector<float> &out, Array2D<float> &
 
 
 void search_grid(Array2D<float>& data, Array2D<float>& locs,
-			Grid& grid, uint32_t gix_start, uint32_t gix_end,
-			uint32_t nt_search, float vsr,
-			float* win_val, uint32_t* win_loc)
+			Grid& grid, size_t gix_start, size_t gix_end,
+			size_t nt_search, float vsr,
+			float* win_val, size_t* win_loc)
 {
-	uint32_t nchan = data.nrow_;
-	auto tt_ixs = Vector<uint32_t>(nchan);	
+	size_t nchan = data.nrow_;
+	auto tt_ixs = Vector<size_t>(nchan);	
 	auto output = Vector<float>(nt_search);
 	float src_loc[3];
 	float *dptr = nullptr;
 	float dist;
 
-	printf("Searching grid points: %d to %d\n", gix_start, gix_end);
+	printf("Searching grid points: %lu to %lu\n", gix_start, gix_end);
 
-	for (uint32_t ipt = gix_start; ipt < gix_end; ++ipt)
+	for (size_t ipt = gix_start; ipt < gix_end; ++ipt)
 	{	
 		// if (ipt % 1000 == 0) {printf("Point: %d / %d\n", ipt, (int) gix_end);}
 		// grid.get_point(ipt, src_loc);
@@ -278,17 +338,17 @@ void search_grid(Array2D<float>& data, Array2D<float>& locs,
 		output.fill(0);
 
 		// For each channel add time comb values to output
-		for (uint32_t i = 0; i < nchan; ++i) 
+		for (size_t i = 0; i < nchan; ++i) 
 		{
 			dptr = data.row(i) + tt_ixs[i];
 		
-			for (uint32_t j = 0; j < nt_search; j++) 
+			for (size_t j = 0; j < nt_search; j++) 
 			{
 				output[j] += dptr[j];
 			}
 		}
 
-		for (uint32_t j = 0; j < nt_search; ++j) 
+		for (size_t j = 0; j < nt_search; ++j) 
 		{
 			if (std::abs(output[j]) > std::abs(win_val[j])) {
 				win_val[j] = output[j];
@@ -300,11 +360,11 @@ void search_grid(Array2D<float>& data, Array2D<float>& locs,
 
 }
 
-void search_grid_parallel(std::vector<uint32_t>& parts, Array2D<float>& data, Array2D<float>& locs, Grid& grid, uint32_t nt_search, float vsr,	Array2D<float>& win_val, Array2D<uint32_t>& win_loc)
+void search_grid_parallel(std::vector<size_t>& parts, Array2D<float>& data, Array2D<float>& locs, Grid& grid, size_t nt_search, float vsr,	Array2D<float>& win_val, Array2D<size_t>& win_loc)
 {
 	std::vector<std::thread> pool;
 
-	for (uint32_t i = 0; i < parts.size() - 1; i++){
+	for (size_t i = 0; i < parts.size() - 1; i++){
 
 		pool.push_back(std::thread([=, &data, &locs, &grid, &win_val, &win_loc] {search_grid(data, locs, grid, parts[i], parts[i + 1], nt_search, vsr, win_val.row(i), win_loc.row(i));}));
 	}
@@ -313,15 +373,15 @@ void search_grid_parallel(std::vector<uint32_t>& parts, Array2D<float>& data, Ar
 }
 
 
-uint64_t factorial(uint64_t n)
+size_t factorial(size_t n)
 {
-	uint64_t ret = 1;
-	for(uint64_t i = 1; i <= n; ++i)
+	size_t ret = 1;
+	for(size_t i = 1; i <= n; ++i)
 		ret *= i;
 	return ret;
 }
 
-uint64_t NChoose2(uint64_t n)
+size_t NChoose2(size_t n)
 {
 	return (n * (n-1)) / 2;
 }
@@ -330,23 +390,23 @@ uint64_t NChoose2(uint64_t n)
 
 Array2D<uint16_t> unique_pairs(Vector<uint16_t>& keys)
 {
-	uint64_t npair = 0;
+	size_t npair = 0;
 
 	// crude way to calc nkeys (wil use dist filters later)
-	for (unsigned i = 0; i < keys.size_; ++i)
+	for (uint i = 0; i < keys.size_; ++i)
 	{
-		for (unsigned j = i + 1; j < keys.size_; ++j)
+		for (uint j = i + 1; j < keys.size_; ++j)
 		{
 			npair += 1;			
 		}
 	}
 
 	auto ckeys = Array2D<uint16_t>(npair, 2);
-	uint64_t row_ix = 0;
+	size_t row_ix = 0;
 
-	for (unsigned i = 0; i < keys.size_; ++i)
+	for (uint i = 0; i < keys.size_; ++i)
 	{
-		for (unsigned j = i + 1; j < keys.size_; ++j)
+		for (uint j = i + 1; j < keys.size_; ++j)
 		{
 			ckeys(row_ix, 0) = keys[i];
 			ckeys(row_ix, 1) = keys[j];
@@ -358,20 +418,20 @@ Array2D<uint16_t> unique_pairs(Vector<uint16_t>& keys)
 
 Array2D<uint16_t> BuildPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist)
 {
-	// uint64_t npair = 0;
-	uint64_t npair_max = NChoose2(keys.size_);
+	// size_t npair = 0;
+	size_t npair_max = NChoose2(keys.size_);
 	printf("max pairs %lu\n", npair_max);
 	auto ckeys = Array2D<uint16_t>(npair_max, 2);
-	uint64_t row_ix = 0;
+	size_t row_ix = 0;
 	float dist;
 	float* loc1 = nullptr;
 	float* loc2 = nullptr;
 	
-	for (unsigned i = 0; i < keys.size_; ++i)
+	for (uint i = 0; i < keys.size_; ++i)
 	{
 		loc1 = stalocs.row(keys[i]);
 
-		for (unsigned j = i + 1; j < keys.size_; ++j)
+		for (uint j = i + 1; j < keys.size_; ++j)
 		{
 			loc2 = stalocs.row(keys[j]);
 			dist = DistCartesian(loc1, loc2);
@@ -387,26 +447,26 @@ Array2D<uint16_t> BuildPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& sta
 	}
 
 	auto ckeys2 = Array2D<uint16_t>(row_ix, 2);
-	for(unsigned i = 0; i < ckeys2.size_; ++i) {
+	for(uint i = 0; i < ckeys2.size_; ++i) {
 		ckeys2[i] = ckeys[i];
 	}
 
 	return ckeys2;
 }
 
-Array2D<uint16_t> BuildNPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist, unsigned ncc)
+Array2D<uint16_t> BuildNPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist, uint ncc)
 {
 	auto ckeys = Array2D<uint16_t>(ncc, 2);
 	
 	std::mt19937::result_type seed = time(0);
-	auto rand_int = std::bind(std::uniform_int_distribution<unsigned>(0, keys.size_), std::mt19937(seed));
+	auto rand_int = std::bind(std::uniform_int_distribution<uint>(0, keys.size_), std::mt19937(seed));
 
 	uint16_t k1, k2; 
 	float dist;
 	float* loc1 = nullptr;
 	float* loc2 = nullptr;
 
-	unsigned i = 0;
+	uint i = 0;
 	while(i < ncc) {
 		k1 = rand_int();
 		k2 = rand_int();

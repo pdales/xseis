@@ -6,8 +6,10 @@
 #include <numeric>
 #include <typeinfo>
 #include <random>
-#include "xseis/structures.h"
+#include <type_traits>
+#include <functional>
 
+#include "xseis/structures.h"
 namespace utils {
 
 
@@ -21,6 +23,68 @@ void random_unique(BidiIter begin, BidiIter end, size_t num_random) {
 		std::swap(*begin, *r);
 		++begin;
 		--left;
+	}
+}
+
+template<typename T, typename UInt>
+Array2D<T> ShuffleRows(Array2D<T>& data, Vector<UInt>& keys) {
+	
+	auto kc = keys.copy();
+	std::srand(std::time(0));
+	std::random_shuffle(kc.begin(), kc.end());
+
+	auto dnew = Array2D<T>(data.nrow_, data.ncol_);
+
+	float *drow = nullptr;
+	for(unsigned i = 0; i < keys.size_; ++i) {
+		drow = data.row(kc[i]);
+		std::copy(drow, drow + data.ncol_, dnew.row(i));		
+	}
+
+	return dnew;
+
+}
+
+
+template<typename T, typename UInt>
+void ShuffleRows(Array2D<T>& data, Vector<UInt>& keys, Array2D<T>& dshuff) {
+	
+	auto kc = keys.copy();
+	std::srand(std::time(0));
+	std::random_shuffle(kc.begin(), kc.end());
+
+	float *drow = nullptr;
+	for(unsigned i = 0; i < keys.size_; ++i) {
+		drow = data.row(kc[i]);
+		std::copy(drow, drow + data.ncol_, dshuff.row(i));		
+	}
+
+}
+
+
+template<typename T>
+void CopyArrayData(Array2D<T>& a, Array2D<T>& b) {	
+	std::copy(a.begin(), a.end(), b.begin());
+}
+
+
+template<typename T>
+void FillRandInt(Vector<T>& d, T min, T max)
+{
+	std::mt19937::result_type seed = time(0);
+	auto rand = std::bind(std::uniform_int_distribution<T>(min, max), std::mt19937(seed));
+	for(unsigned i = 0; i < d.size_; ++i) {
+		d[i] = rand();
+	}
+}
+
+template<typename T>
+void FillRandFloat(Vector<T>& d, T min, T max)
+{
+	std::mt19937::result_type seed = time(0);
+	auto rand = std::bind(std::uniform_real_distribution<T>(min, max), std::mt19937(seed));
+	for(unsigned i = 0; i < d.size_; ++i) {
+		d[i] = rand();
 	}
 }
 
@@ -147,7 +211,7 @@ void WritePowerGrid(std::string fname, Vector<T>& pwr, Grid& grid){
 	myfile << "\n";
 	myfile << grid.nz << " " << grid.ny << " " << grid.nx << "\n";
 
-	for (uint64_t i = 0; i < pwr.size_; ++i) {	
+	for (size_t i = 0; i < pwr.size_; ++i) {	
 		myfile << pwr[i] << " ";
 	}
 	myfile.close();	

@@ -14,32 +14,41 @@ template <typename T>
 class Vector {	
 public:
 	T *data_ = nullptr;
-	uint64_t size_ = 0;
+	size_t size_ = 0;
 
 	Vector() {}
-	Vector(T *data, uint64_t size): data_(data), size_(size) {}
-	Vector(uint64_t size): size_(size) {data_ = new T[size_]();}
-
+	Vector(T *data, size_t size): data_(data), size_(size) {}
+	Vector(size_t size): size_(size) {data_ = new T[size_]();}
+	
 	~Vector(){delete data_;}
-	void set_data_(T* arg) {data_ = arg;}
+
+	Vector<T> copy()
+	{
+		auto vcopy = Vector<T>(size_);
+        std::copy(data_, data_ + size_, vcopy.data_);
+        return vcopy;
+	}
+
+
+	void set_dptr(T* arg) {data_ = arg;}
 
 	void arange(T start, T stop, T step){
 		size_ = (stop - start) / step;
 
-		for (uint64_t i = 0; i < size_; ++i) {
+		for (size_t i = 0; i < size_; ++i) {
 			data_[i] = start + i * step;			
 		}
 	}
 
-	T& operator[] (uint64_t ix) {return data_[ix];}
-	T& operator() (uint64_t ix){return data_[ix];}
-	T* ptr(uint64_t ix) {
+	T& operator[] (size_t ix) {return data_[ix];}
+	T& operator() (size_t ix){return data_[ix];}
+	T* ptr(size_t ix) {
 		return data_ + ix;
 	}
 	T* begin() {return data_;}
 	T* end() {return data_ + size_;}
 
-	uint64_t argmax(){
+	size_t argmax(){
 		return std::distance(data_, std::max_element(data_, data_ + size_));
 	}
 
@@ -47,14 +56,14 @@ public:
 	void fill(T value){std::fill(data_, data_ + size_, value);}
 	
 	void multiply(T value){
-		for (uint64_t i = 0; i < size_; ++i) {
+		for (size_t i = 0; i < size_; ++i) {
 			data_[i] *= value;
 		}
 	}
 
 	T sum(){
 		T total = 0;
-		for (uint64_t i = 0; i < size_; ++i) {
+		for (size_t i = 0; i < size_; ++i) {
 			total += data_[i];
 		}
 		return total;
@@ -62,7 +71,7 @@ public:
 
 	T energy(){
 		T total = 0;
-		for (uint64_t i = 0; i < size_; ++i) {
+		for (size_t i = 0; i < size_; ++i) {
 			total += data_[i] * data_[i];
 		}
 		return total;
@@ -74,30 +83,30 @@ template <typename T>
 class Array2D {
 public:
 	T *data_ = nullptr;
-	uint64_t nrow_, ncol_;
-	uint64_t size_ = 0;
-	uint64_t shape_[2];
+	size_t nrow_, ncol_;
+	size_t size_ = 0;
+	size_t shape_[2];
 
 	// // Array2D() {}
 	// // init from existing allocated memory - deprecated
-	Array2D(T *data, uint64_t nrow, uint64_t ncol)
+	Array2D(T *data, size_t nrow, size_t ncol)
 	:data_(data), nrow_(nrow), ncol_(ncol) 
 	{
-		size_ = (uint64_t) nrow_ * ncol_;
+		size_ = (size_t) nrow_ * ncol_;
 		shape_[0] = nrow_;
 		shape_[1] = ncol_;
 	}
 
 	// init array and allocate memory
-	Array2D(uint64_t nrow, uint64_t ncol)
+	Array2D(size_t nrow, size_t ncol)
 	: nrow_(nrow), ncol_(ncol){
-		size_ = (uint64_t) nrow_ * ncol_;
+		size_ = (size_t) nrow_ * ncol_;
 		shape_[0] = nrow_;
 		shape_[1] = ncol_;
 		data_ = new T[size_];
 	}
 
-	// void resize_rows(uint64_t nrow_new) {
+	// void resize_rows(size_t nrow_new) {
 
 	// if(void* mem = std::realloc(data_, nrow_new * ncol_))
 	// 	data_ = static_cast<char*>(mem);
@@ -106,7 +115,7 @@ public:
  //        }
 
 	// // init array from shape and allocate memory
-	// Array2D(uint64_t shape[2])
+	// Array2D(size_t shape[2])
 	// : nrow_(shape[0]), ncol_(shape[1]), size_(nrow_ * ncol_){
 	// 	shape_[0] = nrow_;
 	// 	shape_[1] = ncol_;
@@ -118,15 +127,15 @@ public:
 	Array2D(Array2D&&) = default;
 
 	// Get value at flattened index ix
-	T& operator[] (uint64_t ix){return data_[ix];}
+	T& operator[] (size_t ix){return data_[ix];}
 
 	// Get value at simulated (row, col)
-	T& operator() (uint64_t ix_row, uint64_t ix_col){
+	T& operator() (size_t ix_row, size_t ix_col){
 		return data_[ix_row * ncol_ + ix_col];
 	}
 
 	// Return pointer to i'th row, segfaults for large arrays..
-	T* row(uint64_t irow) {
+	T* row(size_t irow) {
 		return data_ + (irow * ncol_);
 		// return data_ + (irow * ncol_);
 	}
@@ -142,17 +151,17 @@ public:
 		T *out_ptr = nullptr;
 
 		// sum each row			
-		for (uint64_t i = 0; i < nrow_; ++i)
+		for (size_t i = 0; i < nrow_; ++i)
 		{
 			out_ptr = data_ + i * ncol_;
 
-			for (uint64_t j = 0; j < ncol_; ++j) {
+			for (size_t j = 0; j < ncol_; ++j) {
 				out[j] += out_ptr[j];
 			}				
 		}
 
 		// // divide by nrow to get mean
-		// for (uint64_t j = 0; j < ncol_; ++j) {
+		// for (size_t j = 0; j < ncol_; ++j) {
 		// 		out[j] /= nrow_;
 		// 	}
 
@@ -162,7 +171,7 @@ public:
 	void arange(T start, T stop, T step){
 		size_ = (stop - start) / step;
 
-		for (uint64_t i = 0; i < size_; ++i) {
+		for (size_t i = 0; i < size_; ++i) {
 			data_[i] = start + i * step;			
 		}
 	}
@@ -182,11 +191,11 @@ public:
 	float xmin, ymin, zmin;
 	float x, y, z;
 	// float zmax = lims[5];
-	uint64_t nx, ny, nz;
-	uint64_t ix, iy, iz;
-	uint64_t npts;
-	uint64_t size;
-	// uint64_t size = 0;
+	size_t nx, ny, nz;
+	size_t ix, iy, iz;
+	size_t npts;
+	size_t size;
+	// size_t size = 0;
 
 	Grid() {}
 	Grid(std::vector<float> lims):
@@ -194,7 +203,7 @@ public:
 		nx = (lims[1] - lims[0]) / spacing;
 		ny = (lims[3] - lims[2]) / spacing;
 		nz = (lims[5] - lims[4]) / spacing;
-		npts = (uint64_t) nx * ny * nz;
+		npts = (size_t) nx * ny * nz;
 		size = npts * 3;
 		printf("Grid (%lu x %lu x %lu) = %lu\n", nx, ny, nz, npts);
 	}
@@ -203,10 +212,10 @@ public:
 	// Array2D<float> build_points(){
 
 	// 	auto points = Array2D<float>(npts, 3);
-	// 	uint64_t ix = 0;		
-	// 	for (uint64_t i = 0; i < nz; ++i) {
-	// 		for (uint64_t j = 0; j < ny; ++j) {
-	// 			for (uint64_t k = 0; k < nx; ++k) {
+	// 	size_t ix = 0;		
+	// 	for (size_t i = 0; i < nz; ++i) {
+	// 		for (size_t j = 0; j < ny; ++j) {
+	// 			for (size_t k = 0; k < nx; ++k) {
 	// 				points.row(ix)[0] = xmin + k * spacing;
 	// 				points.row(ix)[1] = ymin + j * spacing;
 	// 				points.row(ix)[2] = zmin + i * spacing;
@@ -223,9 +232,9 @@ public:
 		auto points = Array2D<float>(npts, 3);
 		float* row_ix = points.data_;
 		
-		for (uint64_t i = 0; i < nz; ++i) {
-			for (uint64_t j = 0; j < ny; ++j) {
-				for (uint64_t k = 0; k < nx; ++k) {					
+		for (size_t i = 0; i < nz; ++i) {
+			for (size_t j = 0; j < ny; ++j) {
+				for (size_t k = 0; k < nx; ++k) {					
 					row_ix[0] = xmin + k * spacing;
 					row_ix[1] = ymin + j * spacing;
 					row_ix[2] = zmin + i * spacing;
@@ -236,7 +245,7 @@ public:
 		return points;
 	}
 
-	uint64_t get_index(float *point){
+	size_t get_index(float *point){
 		
 		x = point[0];
 		y = point[1];
@@ -247,7 +256,7 @@ public:
 		return (iz * nx * ny) + (iy * nx) + ix;
 	}
 
-	void get_point(uint64_t index, float *buf){
+	void get_point(size_t index, float *buf){
 				
 		ix = index % nx;
 		iy = ((index - ix) / nx) % ny;
@@ -261,7 +270,7 @@ public:
 		buf[2] = z;
 	}
 
-	// std::vector<float, 3> get_point(uint64_t index){
+	// std::vector<float, 3> get_point(size_t index){
 				
 	// 	ix = index % nx;
 	// 	iy = ((index - ix) / nx) % ny;
