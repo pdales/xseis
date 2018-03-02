@@ -268,7 +268,7 @@ template <typename T>
 void print_time_sigs(T* data, int nsig, int npts){
 	for (int i = 0; i < nsig * npts; ++i) {
 		if (i % npts == 0){printf("\n");}
-			printf("%.3f ", float(data[i]));
+			printf("%.5f ", float(data[i]));
 	}
 	printf("\n");
 }

@@ -36,12 +36,11 @@ struct Dataset {
 		dtype_ = dset_.getDataType();		
 	}
 
-	// template <typename T>	
-	// void load_full_buffer(T *buffer) {
-	// 	hsize_t dim_flat[1] = {size_};
-	// 	H5::DataSpace mspace(1, dim_flat);		
-	// 	dset.read(buffer, dtype, mspace, filespace);
-	// 	}
+	template <typename T>	
+	void load_full_buffer(T *buffer) {
+		H5::DataSpace mspace(rank_, shape_);
+		dset_.read(buffer, dtype_, mspace, filespace_);
+		}		
 
 	template <typename T>	
 	void load_full(Array2D<T> &arr) {
@@ -54,6 +53,13 @@ struct Dataset {
 
 	Array2D<float> load_float_array() {
 		auto arr = Array2D<float>({(size_t) nrow_, (size_t) ncol_});
+		H5::DataSpace mspace(rank_, shape_);
+		dset_.read(arr.data_, dtype_, mspace, filespace_);
+		return arr;		
+		}
+
+	Array2D<int> load_int_array() {
+		auto arr = Array2D<int>({(size_t) nrow_, (size_t) ncol_});
 		H5::DataSpace mspace(rank_, shape_);
 		dset_.read(arr.data_, dtype_, mspace, filespace_);
 		return arr;		
@@ -102,13 +108,13 @@ struct File {
 	// size_t nrow_, ncol_;
 	// const H5std_string file_path; 
 	H5::H5File hfile;
-	
+
 	// File() {}
 	// File(const H5std_string file_path): file_path(file_path){
 	// 	hfile = H5::H5File(file_path, H5F_ACC_RDONLY);
 	// }
 	File(const H5std_string file_path){
-		hfile = H5::H5File(file_path, H5F_ACC_RDONLY);
+		hfile = H5::H5File(file_path, H5F_ACC_RDONLY);		
 	}
 
 	Dataset operator[] (const H5std_string dset_name){		

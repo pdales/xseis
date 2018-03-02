@@ -21,6 +21,7 @@ public:
 	Vector(size_t size): size_(size) {data_ = new T[size_]();}
 	
 	~Vector(){delete data_;}
+	Vector(Vector&&) = default;
 
 	Vector<T> copy()
 	{
@@ -33,10 +34,19 @@ public:
 	void set_dptr(T* arg) {data_ = arg;}
 
 	void arange(T start, T stop, T step){
-		size_ = (stop - start) / step;
+		size_t size = (stop - start) / step;
+
+		for (size_t i = 0; i < size; ++i) {
+			data_[i] = start + i * step;			
+		}
+	}
+
+	void linspace(float start, float stop){
+		// size_ =  / step;
+		size_t step = (stop - start) / size_;
 
 		for (size_t i = 0; i < size_; ++i) {
-			data_[i] = start + i * step;			
+			data_[i] = start + i * step;
 		}
 	}
 
@@ -288,6 +298,8 @@ public:
 
 	
 };
+
+
 
 
 struct Clock {
