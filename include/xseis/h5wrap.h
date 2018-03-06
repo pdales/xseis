@@ -66,10 +66,17 @@ struct Dataset {
 		}
 
 	Vector<float> load_float_vector() {
-		auto vec = Vector<float>(nrow_);
+		auto vec = Vector<float>((size_t) nrow_);
 		H5::DataSpace mspace(1, shape_);
 		dset_.read(vec.data_, dtype_, mspace, filespace_);
-		return vec;		
+		return vec;
+		}
+
+	Vector<int> load_int_vector() {
+		auto vec = Vector<int>((size_t) nrow_);
+		H5::DataSpace mspace(1, shape_);
+		dset_.read(vec.data_, dtype_, mspace, filespace_);
+		return vec;
 		}
 
 	template <typename T>	

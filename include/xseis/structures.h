@@ -139,10 +139,12 @@ public:
 	// Get value at flattened index ix
 	T& operator[] (size_t ix){return data_[ix];}
 
+
 	// Get value at simulated (row, col)
 	T& operator() (size_t ix_row, size_t ix_col){
 		return data_[ix_row * ncol_ + ix_col];
 	}
+
 
 	// Return pointer to i'th row, segfaults for large arrays..
 	T* row(size_t irow) {
