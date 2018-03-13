@@ -65,6 +65,13 @@ struct Dataset {
 		return arr;		
 		}
 
+	Array2D<uint16_t> load_uint16_array() {
+		auto arr = Array2D<uint16_t>({(size_t) nrow_, (size_t) ncol_});
+		H5::DataSpace mspace(rank_, shape_);
+		dset_.read(arr.data_, dtype_, mspace, filespace_);
+		return arr;		
+		}
+
 	Vector<float> load_float_vector() {
 		auto vec = Vector<float>((size_t) nrow_);
 		H5::DataSpace mspace(1, shape_);

@@ -8,6 +8,13 @@
 
 namespace beamform {
 
+
+inline float AngleBetweenPoints(float* a, float*b) 
+{
+	return std::atan((a[1] - b[1]) / (a[0] - b[0]));
+	// return std::atan2(a[1] - b[1], a[0] - b[0]);
+}
+
 inline float DistCartesian(float* a, float* b)
 {	
 	float dx = a[0] - b[0];
@@ -78,6 +85,8 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 	}	
 	return output;
 }
+
+
 
 // Divide grid into chunks to prevent cache invalidations in writing (see Ben Baker migrate)
 // This is consumes less memory
@@ -492,6 +501,80 @@ Array2D<uint16_t> BuildNPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& st
 	}
 	
 	return ckeys;
+}
+
+
+Array2D<uint16_t> BuildNPairsDistAngleFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist, uint ncc)
+{
+	auto ckeys = Array2D<uint16_t>(ncc, 2);
+	
+	std::mt19937::result_type seed = time(0);
+	auto rand_int = std::bind(std::uniform_int_distribution<uint>(0, keys.size_), std::mt19937(seed));
+
+	uint16_t k1, k2; 
+	float dist, angle;
+	float* loc1 = nullptr;
+	float* loc2 = nullptr;
+
+	uint i = 0;
+	while(i < ncc) {
+		k1 = rand_int();
+		k2 = rand_int();
+		if(k1 != k2) {
+			loc1 = stalocs.row(keys[k1]);
+			loc2 = stalocs.row(keys[k2]);
+			dist = DistCartesian(loc1, loc2);
+			// printf("[%u,%u] %.2f \n",i, j, dist);
+			if (dist > min_dist && dist < max_dist)
+			{	
+				angle = AngleBetweenPoints(loc1, loc2);
+
+				if(angle < -0.14 || angle > -0.10) {
+					ckeys.row(i)[0] = keys[k1];
+					ckeys.row(i)[1] = keys[k2];
+					i++;
+				}
+			}
+		}
+	}
+
+	
+	return ckeys;
+}
+
+uint TotalNPairsDistAngleFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist)
+{
+	// auto ckeys = Array2D<uint16_t>(ncc, 2);
+	uint ncc = 0;
+	// std::mt19937::result_type seed = time(0);
+	// auto rand_int = std::bind(std::uniform_int_distribution<uint>(0, keys.size_), std::mt19937(seed));
+
+	uint16_t k1, k2; 
+	float dist, angle;
+	float* loc1 = nullptr;
+	float* loc2 = nullptr;
+
+	uint ntot = 0;
+
+	for(size_t i = 0; i < keys.size_; ++i) {
+		for(size_t j = i + 1; j < keys.size_; ++j) {
+			ntot++;	
+			loc1 = stalocs.row(keys[i]);
+			loc2 = stalocs.row(keys[j]);
+			dist = DistCartesian(loc1, loc2);
+			// printf("[%u,%u] %.2f \n",i, j, dist);
+			if (dist > min_dist && dist < max_dist)
+			{	
+				angle = AngleBetweenPoints(loc1, loc2);
+
+				if(angle < -0.14 || angle > -0.10) {					
+					ncc++;
+				}
+			}
+		}
+	}
+	std::cout << "nt: " << ntot << '\n';
+	return ncc;
 }
 
 

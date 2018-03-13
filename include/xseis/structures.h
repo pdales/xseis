@@ -188,6 +188,12 @@ public:
 		}
 	}
 
+	void multiply(T value){
+		for (size_t i = 0; i < size_; ++i) {
+			data_[i] *= value;
+		}
+	}
+
 	void fill(T value){std::fill(data_, data_ + size_, value);}	
 };
 

@@ -11,6 +11,7 @@ class FftHandler {
 		int patience_;
 		const int nthread_;
 		fftwf_plan plan_fwd_ = NULL;
+		fftwf_plan plan_fwd2_ = NULL;
 		fftwf_plan plan_inv_= NULL;	
 		fftwf_plan plan_inv_cc_= NULL;	
 
@@ -87,6 +88,38 @@ class FftHandler {
 
 		}
 
+
+		void plan_fwd2(Array2D<float>& data, Array2D<fftwf_complex>& arr_outf32)
+		{
+			nsig_ = data.nrow_;
+			npts_ = data.ncol_;
+			wlen_ = data.ncol_;
+			nfreq_ = wlen_ / 2 + 1;
+
+			inf32_ = data.data_;
+
+			// outf32_ = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * nsig_ * nfreq_);
+			// auto arr_outf32 = Array2D<fftwf_complex>(outf32_, nsig_, nfreq_);
+			// auto arr_outf32 = Array2D<fftwf_complex>({nsig_, nfreq_});
+			outf32_ = arr_outf32.data_;
+
+			// ini32_ = outf32_;
+			// outi32_ = new float[nsig_ * wlen_];
+
+			nf[0]    = wlen_;        // 1D real transform length
+			howmanyf = nsig_;   // Number of transforms
+			idistf = npts_;   // Distance between start of k'th input
+			odistf = nfreq_;     // Distance between start of k'th output 
+			
+			plan_fwd2_ = fftwf_plan_many_dft_r2c(rank, nf, howmanyf,
+													inf32_, inembed,
+													istride, idistf,
+													outf32_, onembed,
+													ostride, odistf,
+													patience_);
+
+		}
+
 		Array2D<float> plan_inv(Array2D<fftwf_complex>& data)
 		{
 			nsig_ = data.nrow_;
@@ -113,6 +146,33 @@ class FftHandler {
 
 			return arr_outi32;
 		}
+
+		void plan_inv(Array2D<fftwf_complex>& fdata, Array2D<float>& arr_outi32)
+		{
+			nsig_ = fdata.nrow_;
+			nfreq_ = fdata.ncol_;
+			
+			npts_ = (nfreq_ - 1) * 2;
+
+			ini32_ = fdata.data_;
+			// auto arr_outi32 = Array2D<float>({nsig_, npts_});
+			outi32_ = arr_outi32.data_;
+
+			ni[0]    = npts_;        // Length of time-domain data to inverse (cclen)
+			howmanyi = nsig_; // Number of inverse transforms
+			idisti = nfreq_;     // Distance between start of k'th input
+			odisti = npts_;   // Distance between start of k'th output 
+
+			
+			plan_inv_ = fftwf_plan_many_dft_c2r(rank, ni, howmanyi,
+													ini32_, inembed,
+													istride, idisti,
+													outi32_, onembed,
+													ostride, odisti,
+													patience_);
+
+		}
+
 
 		Array2D<float> plan_inv_cc(Array2D<fftwf_complex>& data)
 		{
@@ -144,6 +204,11 @@ class FftHandler {
 		void exec_fwd()
 		{			
 			fftwf_execute(plan_fwd_);
+		}
+
+		void exec_fwd2()
+		{			
+			fftwf_execute(plan_fwd2_);
 		}
 
 		void exec_fwd(uint32_t offset)
