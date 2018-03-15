@@ -1,5 +1,8 @@
-#ifndef FftHandler_H
-#define FftHandler_H
+// Wrapper for FFTW3, needs quite a bit of work.
+// Would be more flexible if it returned fttw_plans instead of allocated data
+
+#ifndef FFTHANDLER_H
+#define FFTHANDLER_H
 
 #include <iostream>
 #include <fftw3.h>
@@ -17,17 +20,16 @@ class FftHandler {
 
 		// describes real input array
 		float* inf32_;
-		// int nsig_, npts_;
-		uint32_t nsig_, npts_;
+		uint nsig_, npts_;
 
 		// describes plan_fwd_ output
 		fftwf_complex* outf32_;
-		uint32_t nfreq_;
+		uint nfreq_;
 
 		// describes plan_inv_ output
 		fftwf_complex* ini32_;
 		float* outi32_;
-		uint32_t wlen_;
+		uint wlen_;
 
 		// fftwf_complex* outf32_cc;
 		int nf[1], ni[1], idistf, idisti, howmanyf, howmanyi, odistf, odisti;
@@ -56,8 +58,10 @@ class FftHandler {
 			fftwf_cleanup();
 		}
 
-		Array2D<fftwf_complex> plan_fwd(Array2D<float>& data, uint32_t wlen)
+		Array2D<fftwf_complex> plan_fwd(Array2D<float>& data, uint wlen)
 		{
+			// plan forward transform and return complex buffer
+
 			nsig_ = data.nrow_;
 			npts_ = data.ncol_;
 			wlen_ = wlen;
@@ -67,16 +71,11 @@ class FftHandler {
 
 			outf32_ = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * nsig_ * nfreq_);
 			auto arr_outf32 = Array2D<fftwf_complex>(outf32_, nsig_, nfreq_);
-			// auto arr_outf32 = Array2D<fftwf_complex>({nsig_, nfreq_});
-			// outf32_ = arr_outf32.data_;
-
-			// ini32_ = outf32_;
-			// outi32_ = new float[nsig_ * wlen_];
-
+			
 			nf[0]    = wlen_;        // 1D real transform length
-			howmanyf = nsig_;   // Number of transforms
-			idistf = npts_;   // Distance between start of k'th input
-			odistf = nfreq_;     // Distance between start of k'th output 
+			howmanyf = nsig_;       // Number of transforms
+			idistf = npts_;        // Distance between start of k'th input
+			odistf = nfreq_;      // Distance between start of k'th output 
 			
 			plan_fwd_ = fftwf_plan_many_dft_r2c(rank, nf, howmanyf,
 													inf32_, inembed,
@@ -91,6 +90,7 @@ class FftHandler {
 
 		void plan_fwd2(Array2D<float>& data, Array2D<fftwf_complex>& arr_outf32)
 		{
+			// plan forward transform to specified complex buffer
 			nsig_ = data.nrow_;
 			npts_ = data.ncol_;
 			wlen_ = data.ncol_;
@@ -122,6 +122,7 @@ class FftHandler {
 
 		Array2D<float> plan_inv(Array2D<fftwf_complex>& data)
 		{
+			// Plan inverse transform and return real output buffer
 			nsig_ = data.nrow_;
 			nfreq_ = data.ncol_;
 			
@@ -211,7 +212,7 @@ class FftHandler {
 			fftwf_execute(plan_fwd2_);
 		}
 
-		void exec_fwd(uint32_t offset)
+		void exec_fwd(uint offset)
 		{			
 			fftwf_execute_dft_r2c(plan_fwd_, inf32_ + offset, outf32_);
 		}
@@ -226,74 +227,6 @@ class FftHandler {
 			fftwf_execute(plan_inv_cc_);
 
 		}
-
-
-		// // void plan_strided(structures::Array2D<float>& data, int wlen_arg)
-		// void plan_strided(float* data, uint32_t shape[2], int wlen_arg)
-		// {
-		// 	nsig_ = shape[0];
-		// 	npts_ = shape[1];
-		// 	wlen_ = wlen_arg;
-		// 	nfreq_ = wlen_ / 2 + 1;
-
-		// 	inf32_ = data;
-		// 	// inf32_shape = shape;
-
-		// 	// allocate memory, will move this out later
-		// 	outf32_ = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * nsig_ * nfreq_);
-		// 	ini32_ = outf32_;
-		// 	outi32_ = new float[nsig_ * wlen_];
-
-		// 	nf[0]    = wlen_;        // 1D real transform length
-		// 	howmanyf = nsig_;   // Number of transforms
-		// 	idistf = npts_;   // Distance between start of k'th input
-		// 	odistf = nfreq_;     // Distance between start of k'th output 
-		// 	ni[0]    = wlen_;        // Length of time-domain data to inverse (cclen)
-		// 	howmanyi = nsig_; // Number of inverse transforms
-		// 	idisti = nfreq_;     // Distance between start of k'th input
-		// 	odisti = wlen_;   // Distance between start of k'th output 
-
-			
-		// 	plan_fwd_ = fftwf_plan_many_dft_r2c(rank, nf, howmanyf,
-		// 											inf32_, inembed,
-		// 											istride, idistf,
-		// 											outf32_, onembed,
-		// 											ostride, odistf,
-		// 											patience_);
-
-		// 	plan_inv_ = fftwf_plan_many_dft_c2r(rank, ni, howmanyi,
-		// 											ini32_, inembed,
-		// 											istride, idisti,
-		// 											outi32_, onembed,
-		// 											ostride, odisti,
-		// 											patience_);
-
-		// }
-
-
-		// void plan_cc(float *arg_data_cc, int arg_ncc)
-		// {
-		// 	printf("Planning CC fft/ifft.. ");
-		// 	clock_t tStart = clock();
-
-		// 	ncc = arg_ncc;
-		// 	data_cc = arg_data_cc;
-
-		// 	fdata_cc = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * nfreq_ * ncc);
-		// 	// fdata_cc = float (*fdata)[2]
-
-		// 	plan3 = fftwf_plan_many_dft_c2r(1, &npts_, ncc, fdata_cc, NULL, 1, nfreq_, data_cc, NULL, 1, npts_, patience_);
-
-		// 	printf("Completed in %.3f seconds\n", (float)(clock() - tStart)/CLOCKS_PER_SEC);
-		// }
-
-		// void run_cc(int *ckeys)
-		// {
-		// 	printf("nsig_= %d nfreq_ = %d ncc = %d \n", nsig_, nfreq_, ncc);
-		// 	process::correlate_all_parallel(fdata, nsig_, nfreq_, fdata_cc, ckeys, ncc,  nthreads);
-		// 	// process::correlate_all(fdata, nsig_, nfreq_, fdata_cc, ckeys, ncc);
-		// }
-
 
 };
 #endif

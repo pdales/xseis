@@ -1,3 +1,7 @@
+/*
+Beamforming functions.
+
+*/
 #ifndef BEAMFORM_H
 #define BEAMFORM_H
 
@@ -35,9 +39,10 @@ uint mod_floor(int a, int n) {
 }
 
 
-// Each thread given own output buffer to prevent cache invalidations
 Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint16_t nthreads)
 {
+	// Each thread given own output buffer to prevent cache invalidations
+	// todo: move output alloc outside of this
 
 	const size_t cclen = data_cc.ncol_;
 	const size_t ncc = data_cc.nrow_;
@@ -52,7 +57,7 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 	{
 		float *out_ptr = output.row(omp_get_thread_num());
 		std::fill(out_ptr, out_ptr + ngrid, 0);
-		// play around with loop scheduling here (later iterations should be slightly slower due to faster  changin ckeys)
+		// play around with omp loop scheduling here
 		#pragma omp for
 		for (size_t i = 0; i < ncc; ++i)
 		{
@@ -72,6 +77,7 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 			{
 				// Get appropriate ix of unrolled ccfs (same as mod_floor)
 				// by wrapping negative traveltime differences
+				// if-else much faster than more elegant mod function
 				if (tts_sta2[j] >= tts_sta1[j])
 				{
 					out_ptr[j] += cc_ptr[tts_sta2[j] - tts_sta1[j]];					
@@ -88,10 +94,11 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 
 
 
-// Divide grid into chunks to prevent cache invalidations in writing (see Ben Baker migrate)
-// This is consumes less memory
+
 Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint nthreads, size_t blocksize)
 {
+	// Divide grid into chunks to prevent cache invalidations during writing (see Ben Baker migrate)
+	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
 
 	const size_t cclen = data_cc.ncol_;
 	const size_t ncc = data_cc.nrow_;
@@ -109,11 +116,8 @@ Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, 
 
 	#pragma omp parallel for private(tts_sta1, tts_sta2, cc_ptr, out_ptr, blocklen) num_threads(nthreads)
 	for(size_t iblock = 0; iblock < ngrid; iblock += blocksize) {
-	// for(size_t iblock = 0; iblock < ngrid / blocklen; ++iblock) {
 
 		blocklen = std::min(ngrid - iblock, blocksize);
-		// std::cout << iblock << ", len: ";
-		// std::cout << blocklen << '\n';
 
 		out_ptr = output.data_ + iblock;
 		// out_ptr = output.data_ + iblock * blocklen;
@@ -148,8 +152,7 @@ Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, 
 	return output;
 }
 
-// Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint nthreads,
-// std::tuple<Vector<float>&, Vector<size_t>&>
+// Delay and summing raw waveforms for all gridlocs for all possible starttimes
 void NaiveSearch(Array2D<float>& data, Array2D<uint16_t>& ttable, size_t tmin, size_t tmax, Vector<float>& wpower, Vector<size_t>& wlocs)
 {
 
@@ -209,68 +212,8 @@ void NaiveSearch(Array2D<float>& data, Array2D<uint16_t>& ttable, size_t tmin, s
 
 
 
-// std::tuple<Vector<float>, Vector<size_t>> NaiveSearchTuple(Array2D<float>& data, Array2D<uint16_t>& ttable, size_t tmin, size_t tmax)
-// {
 
-// 	// std::cout << data.nrow_ << '\n';
-// 	// std::cout << ttable.ncol_ << '\n';
-// 	size_t nt = tmax - tmin;
-// 	size_t nsig = data.nrow_;
-// 	size_t ngrid = ttable.nrow_;
-
-// 	// auto tt_ixs = Vector<size_t>(nsig);	
-// 	auto wpower = Vector<float>(nt);
-// 	wpower.fill(0);
-// 	auto wlocs = Vector<size_t>(nt);
-// 	wlocs.fill(0);
-
-// 	float* best_vals = wpower.data_;
-// 	size_t* best_locs = wlocs.data_;
-	
-// 	return std::make_tuple(wpower, wlocs);
-
-// 	// float *dptr = nullptr;
-// 	// uint16_t *tt_ixs = nullptr;
-// 	// // printf("Searching grid points: %lu to %lu\n", gix_start, gix_end);
-// 	// auto tmp_stack = Vector<float>(nt);
-
-// 	// std::cout << "nt: " << nt << '\n';
-// 	// std::cout << "ngrid: " << ngrid << '\n';
-// 	// std::cout << "nsig: " << nsig << '\n';
-
-// 	// for (size_t ipt = 0; ipt < ngrid; ++ipt)
-// 	// {	
-// 	// 	tmp_stack.fill(0);
-// 	// 	tt_ixs = ttable.row(ipt);
-
-// 	// 	if (ipt % 1000 == 0) {
-// 	// 		printf("Progress: %.2f \n", ((float)(ipt) / (ngrid) * 100));
-// 	// 	}
-
-// 	// 	// For each channel add time comb values to output
-// 	// 	for (size_t i = 0; i < nsig; ++i) 
-// 	// 	{
-// 	// 		dptr = data.row(i) + tt_ixs[i] + tmin;
-		
-// 	// 		for (size_t j = 0; j < nt; ++j) 
-// 	// 		{
-// 	// 			tmp_stack[j] += dptr[j];
-// 	// 		}
-// 	// 	}
-
-// 	// 	// #pragma omp simd aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
-// 	// 	for (size_t j = 0; j < nt; ++j) 
-// 	// 	{
-// 	// 		if (std::abs(tmp_stack[j]) > std::abs(best_vals[j])) {
-// 	// 			best_vals[j] = tmp_stack[j];
-// 	// 			best_locs[j] = ipt;
-// 	// 		}
-// 	// 	}	
-// 	// }
-// }
-
-
-// Uses constant velocity medium
+// Uses constant velocity medium, introduce random errors
 Array2D<uint16_t> BuildTTablePerturbVel(Array2D<float>& stalocs, Array2D<float>& gridlocs, float vel, float sr, float perturb)
 {
 	auto ttable = Array2D<uint16_t>(stalocs.nrow_, gridlocs.nrow_);
@@ -324,7 +267,7 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 	return ttable;
 }
 
-// Uses 1D (depth) model specified in vel_effective (1 value per meter)
+// Uses 1D effective velocity model (1 value per meter)
 Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, Vector<float>& vel_effective, float sr)
 {
 	size_t ngrid = gridlocs.nrow_;
@@ -388,21 +331,10 @@ Vector<uint16_t> GetTTOneToMany(float* loc_src, Array2D<float>& locs, float vel,
 }
 
 
-
-size_t factorial(size_t n)
-{
-	size_t ret = 1;
-	for(size_t i = 1; i <= n; ++i)
-		ret *= i;
-	return ret;
-}
-
 size_t NChoose2(size_t n)
 {
 	return (n * (n-1)) / 2;
 }
-
-
 
 Array2D<uint16_t> unique_pairs(Vector<uint16_t>& keys)
 {

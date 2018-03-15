@@ -1,3 +1,10 @@
+/*
+Some thin wrappers around data, mainly so I dont have to pass
+nsig, npts to every function. Should probably use some existing
+ndim array library.
+*/
+
+
 #ifndef STRUCTURES_H
 #define STRUCTURES_H
 #include <iostream>

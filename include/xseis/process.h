@@ -1,3 +1,10 @@
+/*
+Signal processing functions.
+
+Dont notice performance difference using omp simd aligned.
+Seems that c++ vectorizes by default when optimizations on.
+*/
+
 #ifndef PROCESS_H
 #define PROCESS_H
 
@@ -20,14 +27,13 @@
 
 const uint MEM_ALIGNMENT = 16;
 
-// using namespace std::placeholders;
 // typedef std::pair<float, std::array<float, 3> > vpair;
 // typedef std::priority_queue<vpair, std::vector<vpair>, std::greater<vpair>> fe_queue;
 
 namespace process {
 
 
-// Cross-correlate complex signals as multiplication
+// Cross-correlate complex signals, cc(f) = s1(f) x s2*(f)
 #pragma omp declare simd aligned(sig1, sig2, out:MEM_ALIGNMENT)
 void XCorr(fftwf_complex* sig1, fftwf_complex* sig2, fftwf_complex* out, uint32_t nfreq)
 {
@@ -39,7 +45,6 @@ void XCorr(fftwf_complex* sig1, fftwf_complex* sig2, fftwf_complex* out, uint32_
 }
 
 // Cross-correlate signal pairs of fdata and output to fdata_cc
-// #pragma omp declare
 void XCorrPairs(Array2D<fftwf_complex>& fdata, Array2D<uint16_t>& pairs, Array2D<fftwf_complex>& fdata_cc)
 {	
 	uint32_t nfreq = fdata.ncol_;
@@ -57,6 +62,7 @@ void XCorrPairs(Array2D<fftwf_complex>& fdata, Array2D<uint16_t>& pairs, Array2D
 #pragma omp declare simd aligned(data:MEM_ALIGNMENT)
 template <typename T, typename F>
 void ApplyFuncToRows(T *__restrict__ data, size_t nsig, size_t npts, F* func){
+	// Generic map function
 
 	#pragma omp for simd aligned(data:MEM_ALIGNMENT)
 	for (size_t i = 0; i < nsig; i++)
@@ -273,50 +279,44 @@ float standard_deviation(T *data, size_t size) {
 // }
 
 
-// void sliding_average(float *sig, size_t npts, int win_len)
-// {
-// 	if (win_len % 2 == 0){win_len += 1;}
+void sliding_average(float *sig, size_t npts, size_t win_len)
+{
+	if (win_len % 2 == 0){win_len += 1;}
 
-// 	float buf[win_len];
-// 	int buf_idx = 0;
-// 	int half_len = win_len / 2 + 1;
-// 	float curr_sum = 0;
-// 	float buf_in = sig[win_len];
+	float buf[win_len];
+	size_t buf_idx = 0;
+	size_t half_len = win_len / 2 + 1;
+	float curr_sum = 0;
+	float buf_in = sig[win_len];
 
-// 	// Fill buffer and set current sum
-// 	for (int i = 0; i < win_len; ++i) {
-// 		buf[i] = sig[i];
-// 		curr_sum += sig[i];
-// 	}
+	// Fill buffer and set current sum
+	for (size_t i = 0; i < win_len; ++i) {
+		buf[i] = sig[i];
+		curr_sum += sig[i];
+	}
 
-// 	// compute in place sliding avg using ring buffer
-// 	for (int i = 0; i < npts; ++i) {
+	// compute in place sliding avg using ring buffer
+	for (size_t i = 0; i < npts; ++i) {
 
-// 		if (i < half_len || i >= npts - half_len){
-// 			sig[i] = curr_sum / win_len;
-// 			continue;
-// 		}
-// 		curr_sum += buf_in - buf[buf_idx];
-// 		sig[i] = curr_sum / win_len;
+		if (i < half_len || i >= npts - half_len){
+			sig[i] = curr_sum / win_len;
+			continue;
+		}
+		curr_sum += buf_in - buf[buf_idx];
+		sig[i] = curr_sum / win_len;
 
-// 		buf_in = sig[i + half_len];
-// 		buf[buf_idx] = sig[i - 1 + half_len];
-// 		buf_idx = (buf_idx + 1) % win_len;
-// 	}
-// }
+		buf_in = sig[i + half_len];
+		buf[buf_idx] = sig[i - 1 + half_len];
+		buf_idx = (buf_idx + 1) % win_len;
+	}
+}
 
-// void sliding_root_mean_square(float *data, int nsig, int npts, int win_len_smooth)
-// {
-// 	float *sig_tmp = nullptr;
-
-// 	for (int i = 0; i < nsig; ++i)
-// 	{
-// 		sig_tmp = data + (i * npts);
-// 		square_signal(sig_tmp, npts);
-// 		sliding_average(sig_tmp, npts, win_len_smooth);
-// 		root_signal(sig_tmp, npts);
-// 	}
-// }
+void SlidingRMS(float *sig, size_t npts, size_t wlen)
+{
+	square_signal(sig, npts);
+	sliding_average(sig, npts, wlen);
+	root_signal(sig, npts);
+}
 
 
 

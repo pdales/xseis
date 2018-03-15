@@ -1,3 +1,10 @@
+/*
+Classes to read H5 files.
+
+Cant figure out a way to convert H5 datatypes into equivalent c-types,
+hence all the load_type_array like functions. 
+*/
+
 #ifndef H5WRAP_H
 #define H5WRAP_H
 #include <iostream>
@@ -14,6 +21,7 @@
 
 namespace h5wrap {
 
+// wrapper for h5 dataset
 struct Dataset {
 	H5::DataSet dset_;
 	H5::DataSpace filespace_;
@@ -21,10 +29,7 @@ struct Dataset {
 	size_t rank_;
 	H5::DataType dtype_;
 	hsize_t shape_[2] = {1, 1};    // dataset dimensions
-
-	// const H5std_string dset_name; 
 	
-	// Dataset() {}
 	Dataset(H5::DataSet dset): dset_(dset){
 		filespace_ = dset_.getSpace();
 		rank_ = filespace_.getSimpleExtentNdims();
@@ -37,57 +42,8 @@ struct Dataset {
 	}
 
 	template <typename T>	
-	void load_full_buffer(T *buffer) {
-		H5::DataSpace mspace(rank_, shape_);
-		dset_.read(buffer, dtype_, mspace, filespace_);
-		}		
-
-	template <typename T>	
-	void load_full(Array2D<T> &arr) {
-		// hsize_t dim_flat[1] = {size_};
-		H5::DataSpace mspace(rank_, shape_);
-		dset_.read(arr.data_, dtype_, mspace, filespace_);
-
-		}
-
-
-	Array2D<float> load_float_array() {
-		auto arr = Array2D<float>({(size_t) nrow_, (size_t) ncol_});
-		H5::DataSpace mspace(rank_, shape_);
-		dset_.read(arr.data_, dtype_, mspace, filespace_);
-		return arr;		
-		}
-
-	Array2D<int> load_int_array() {
-		auto arr = Array2D<int>({(size_t) nrow_, (size_t) ncol_});
-		H5::DataSpace mspace(rank_, shape_);
-		dset_.read(arr.data_, dtype_, mspace, filespace_);
-		return arr;		
-		}
-
-	Array2D<uint16_t> load_uint16_array() {
-		auto arr = Array2D<uint16_t>({(size_t) nrow_, (size_t) ncol_});
-		H5::DataSpace mspace(rank_, shape_);
-		dset_.read(arr.data_, dtype_, mspace, filespace_);
-		return arr;		
-		}
-
-	Vector<float> load_float_vector() {
-		auto vec = Vector<float>((size_t) nrow_);
-		H5::DataSpace mspace(1, shape_);
-		dset_.read(vec.data_, dtype_, mspace, filespace_);
-		return vec;
-		}
-
-	Vector<int> load_int_vector() {
-		auto vec = Vector<int>((size_t) nrow_);
-		H5::DataSpace mspace(1, shape_);
-		dset_.read(vec.data_, dtype_, mspace, filespace_);
-		return vec;
-		}
-
-	template <typename T>	
 	void LoadChunk(Array2D<T> &arr, hsize_t offset[2]) {
+		// Loads hyperslab with arr dimensions at specified offset
 
 		// Define slab size
 		hsize_t count[2] = {arr.nrow_, arr.ncol_};
@@ -95,7 +51,7 @@ struct Dataset {
 
 		H5::DataSpace mspace(2, count);
 		dset_.read(arr.data_, dtype_, mspace, filespace_);
-		}
+	}
 
 	template <typename T>	
 	void LoadRows(Array2D<T>& arr, Vector<uint16_t>& keys, hsize_t col_offset) {
@@ -112,21 +68,65 @@ struct Dataset {
 			offset[0] = keys[i];
 			filespace_.selectHyperslab(H5S_SELECT_SET, count, offset);
 			dset_.read(arr.row(i), dtype_, mspace, filespace_);			
-		}
+		}		
+	}
 
-		
-		}	
+
+	template <typename T>	
+	void load_full_buffer(T *buffer) {
+		H5::DataSpace mspace(rank_, shape_);
+		dset_.read(buffer, dtype_, mspace, filespace_);
+	}		
+
+	template <typename T>	
+	void load_full(Array2D<T> &arr) {
+		// hsize_t dim_flat[1] = {size_};
+		H5::DataSpace mspace(rank_, shape_);
+		dset_.read(arr.data_, dtype_, mspace, filespace_);
+	}
+
+
+	Array2D<float> load_float_array() {
+		auto arr = Array2D<float>({(size_t) nrow_, (size_t) ncol_});
+		H5::DataSpace mspace(rank_, shape_);
+		dset_.read(arr.data_, dtype_, mspace, filespace_);
+		return arr;		
+	}
+
+	Array2D<int> load_int_array() {
+		auto arr = Array2D<int>({(size_t) nrow_, (size_t) ncol_});
+		H5::DataSpace mspace(rank_, shape_);
+		dset_.read(arr.data_, dtype_, mspace, filespace_);
+		return arr;		
+	}
+
+	Array2D<uint16_t> load_uint16_array() {
+		auto arr = Array2D<uint16_t>({(size_t) nrow_, (size_t) ncol_});
+		H5::DataSpace mspace(rank_, shape_);
+		dset_.read(arr.data_, dtype_, mspace, filespace_);
+		return arr;		
+	}
+
+	Vector<float> load_float_vector() {
+		auto vec = Vector<float>((size_t) nrow_);
+		H5::DataSpace mspace(1, shape_);
+		dset_.read(vec.data_, dtype_, mspace, filespace_);
+		return vec;
+	}
+
+	Vector<int> load_int_vector() {
+		auto vec = Vector<int>((size_t) nrow_);
+		H5::DataSpace mspace(1, shape_);
+		dset_.read(vec.data_, dtype_, mspace, filespace_);
+		return vec;
+	}
+
 };
 
+// wrapper for h5 file
 struct File {
-	// size_t nrow_, ncol_;
-	// const H5std_string file_path; 
 	H5::H5File hfile;
 
-	// File() {}
-	// File(const H5std_string file_path): file_path(file_path){
-	// 	hfile = H5::H5File(file_path, H5F_ACC_RDONLY);
-	// }
 	File(const H5std_string file_path){
 		hfile = H5::H5File(file_path, H5F_ACC_RDONLY);		
 	}
@@ -137,11 +137,10 @@ struct File {
 
 	template <typename T>
 	void read_attr(const H5std_string attr_name, T val){
-	// float sr = 0.0;
-	H5::Attribute attr = hfile.openAttribute(attr_name);
-	attr.read(attr.getDataType(), val);
+		H5::Attribute attr = hfile.openAttribute(attr_name);
+		attr.read(attr.getDataType(), val);
 
-}
+	}
 
 };
 
