@@ -78,7 +78,7 @@ void ApplyFuncToRows(Array2D<T>& data, F* func){
 
 
 
-Vector<float> BuildWhitenFilter(std::vector<float>& corner_freqs, uint nfreq, float sr)
+Vector<float> BuildFreqFilter(std::vector<float>& corner_freqs, uint nfreq, float sr)
 {
 
 	float fsr = (nfreq * 2 - 1) / sr;
@@ -123,7 +123,7 @@ Vector<float> BuildWhitenFilter(std::vector<float>& corner_freqs, uint nfreq, fl
 
 }
 
-void ApplyWhitenFilter(float (*fdata)[2], uint nfreq, Vector<float>& filter)
+void ApplyFreqFilterReplace(float (*fdata)[2], uint nfreq, Vector<float>& filter)
 {
 	float angle;
 
@@ -140,6 +140,24 @@ void ApplyWhitenFilter(float (*fdata)[2], uint nfreq, Vector<float>& filter)
 		}		
 	}
 
+}
+
+void ApplyFreqFilterMultiply(float (*fdata)[2], uint nfreq, Vector<float>& filter)
+{
+	float angle;
+
+	for (uint i = 0; i < filter.size_; ++i)
+	{
+		if(filter[i] == 0) {
+			fdata[i][0] = 0;
+			fdata[i][1] = 0;
+		}
+		else {
+			angle = std::atan2(fdata[i][1], fdata[i][0]);
+			fdata[i][0] *= filter[i] * std::cos(angle);
+			fdata[i][1] *= filter[i] * std::sin(angle);
+		}		
+	}
 }
 
 
@@ -278,45 +296,103 @@ float standard_deviation(T *data, size_t size) {
 // 	}
 // }
 
+void SlidingWinMax(float *sig, size_t npts, size_t wlen)
+{	
+	// Sliding window max abs val smoothin (horribly slow)
+	
+	absolute(sig, npts);
 
-void sliding_average(float *sig, size_t npts, size_t win_len)
-{
-	if (win_len % 2 == 0){win_len += 1;}
+	if (wlen % 2 == 0){wlen += 1;}
+	size_t hlen = wlen / 2 + 1;
 
-	float buf[win_len];
+	float buf[wlen];
 	size_t buf_idx = 0;
-	size_t half_len = win_len / 2 + 1;
-	float curr_sum = 0;
-	float buf_in = sig[win_len];
 
-	// Fill buffer and set current sum
-	for (size_t i = 0; i < win_len; ++i) {
-		buf[i] = sig[i];
-		curr_sum += sig[i];
+	// Fill buffer with last WLEN vals of sig	
+	std::copy(&sig[npts - wlen], &sig[npts], buf);
+
+
+	// Handle edge case with index wrapin via mod function
+	for (size_t i = npts - hlen; i < npts + hlen; ++i) {
+
+		sig[i % npts] = *std::max_element(buf, buf + wlen);
+		buf[buf_idx] = sig[(i + hlen) % npts];
+		buf_idx = (buf_idx + 1) % wlen;
+	}
+	// handle non-edge case
+	for (size_t i = hlen; i < npts - hlen; ++i) {
+
+		sig[i] = *std::max_element(buf, buf + wlen);
+		buf[buf_idx] = sig[i + hlen];
+		buf_idx = (buf_idx + 1) % wlen;
 	}
 
-	// compute in place sliding avg using ring buffer
-	for (size_t i = 0; i < npts; ++i) {
-
-		if (i < half_len || i >= npts - half_len){
-			sig[i] = curr_sum / win_len;
-			continue;
-		}
-		curr_sum += buf_in - buf[buf_idx];
-		sig[i] = curr_sum / win_len;
-
-		buf_in = sig[i + half_len];
-		buf[buf_idx] = sig[i - 1 + half_len];
-		buf_idx = (buf_idx + 1) % win_len;
-	}
 }
 
-void SlidingRMS(float *sig, size_t npts, size_t wlen)
-{
-	square_signal(sig, npts);
-	sliding_average(sig, npts, wlen);
-	root_signal(sig, npts);
-}
+
+// void SlidingAverage(float *sig, size_t npts, size_t wlen)
+// {
+// 	if (wlen % 2 == 0){wlen += 1;}
+
+// 	float buf[wlen];
+// 	float curr_sum = 0;
+
+// 	size_t buf_idx = 0;
+// 	size_t hlen = wlen / 2 + 1;	
+
+// 	// Do initial buffer fill
+// 	for (size_t i = npts - wlen; i < npts; ++i) {
+// 		buf[i] = sig[i];
+// 		curr_sum += buf[i];
+// 	}
+
+// 	float wlen_f = static_cast<float>(wlen);
+// 	float buf_in = sig[wlen];	
+// 	size_t iwrap = 0;
+// 	// Handle edge case with wrapping
+// 	for (size_t i = npts - hlen; i < npts + hlen; ++i) {
+// 		// iwrap = ;
+// 		sig[i % npts] = curr_sum / wlen_f;
+
+// 		buf_in = sig[(i + hlen) % npts];
+// 		buf[buf_idx] = sig[(i - 1 + hlen) % npts];
+// 		buf_idx = (buf_idx + 1) % wlen;
+
+// 		curr_sum += buf_in - buf[buf_idx];
+
+// 		// buf[i] = sig[iwrap];
+// 		// curr_sum += sig[iwrap];
+// 	}
+
+// 		// 	if (i < half_len || i >= sig_len - half_len){
+// 		// 	sig[i] = curr_sum / win_len;
+// 		// 	continue;
+// 		// }
+// 		// curr_sum += buf_in - buf[buf_idx];
+// 		// sig[i] = curr_sum / win_len;
+
+// 		// buf_in = sig[i + half_len];
+// 		// buf[buf_idx] = sig[i - 1 + half_len];
+// 		// buf_idx = (buf_idx + 1) % win_len;
+
+// 	// compute in place sliding avg using ring buffer
+// 	for (size_t i = 0; i < npts; ++i) {
+		
+// 		curr_sum += buf_in - buf[buf_idx];
+// 		sig[i] = curr_sum / wlen;
+
+// 		buf_in = sig[i + hlen];
+// 		buf[buf_idx] = sig[i - 1 + hlen];
+// 		buf_idx = (buf_idx + 1) % wlen;
+// 	}
+// }
+
+// void SlidingRMS(float *sig, size_t npts, size_t wlen)
+// {
+// 	square_signal(sig, npts);
+// 	SlidingAverage(sig, npts, wlen);
+// 	root_signal(sig, npts);
+// }
 
 
 

@@ -134,6 +134,20 @@ void copy_slice(Array2D<float>& data_in, Vector<uint32_t>& keeprows, uint32_t of
 	}
 }
 
+void CopyArrayDataOffset(Array2D<float>& data_in, uint32_t offset, Array2D<float>& data_out)
+{
+	float *start_out;
+	float *start_in;
+	for (uint32_t i = 0; i < data_in.nrow_; ++i)
+	{	
+		start_in = data_in.row(i) + offset;
+		start_out = data_out.row(i);
+		for (uint32_t j = 0; j < data_out.ncol_; ++j) {
+			start_out[j] = start_in[j];
+		}
+	}
+}
+
 // void copy_slice(Array2D<float>& data_in, Vector<uint32_t>& keeprows, uint32_t offset, Array2D<float>& data_out)
 // {
 // 	uint32_t cix;

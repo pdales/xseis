@@ -16,7 +16,8 @@ int main(void)
 {	
 	uint nthreads = 4;
 	uint nsig = 384;
-	uint wlen = 8192;
+	// uint wlen = 8192;
+	uint wlen = 6000;
 
 	auto data = Array2D<float>(nsig, wlen);
 
@@ -28,20 +29,21 @@ int main(void)
 	utils::PrintArraySize(ckeys, "ckeys");
 
 	// auto fh = FftHandler(FFTW_ESTIMATE, nthreads);
-	auto fh = FftHandler(FFTW_MEASURE, nthreads);
+	// auto fh = FftHandler(FFTW_MEASURE, nthreads);
+	auto fh = FftHandler(FFTW_PATIENT, nthreads);
 
 	auto clock = Clock();
 	clock.start();
 
 	auto fdata = fh.plan_fwd(data, wlen);
-	clock.log("plan fwd");
+	clock.log("plan fwd FFT");
 	// fh.plan_inv(fdata, data);
 
 	// auto pdata = fh.plan_inv(fdata);
 
 	auto fdata_cc = Array2D<fftwf_complex>({ckeys.nrow_, fdata.ncol_});
 	auto data_cc = fh.plan_inv_cc(fdata_cc);
-	clock.log("plan inv");
+	clock.log("plan inv FFT ccs");
 
 	// utils::PrintArraySize(data, "data");
 	// utils::PrintArraySize(fdata_cc, "fdata_cc");

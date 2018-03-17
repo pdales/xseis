@@ -33,8 +33,8 @@ public:
 	Vector<T> copy()
 	{
 		auto vcopy = Vector<T>(size_);
-        std::copy(data_, data_ + size_, vcopy.data_);
-        return vcopy;
+		std::copy(data_, data_ + size_, vcopy.data_);
+		return vcopy;
 	}
 
 
@@ -123,21 +123,6 @@ public:
 		data_ = new T[size_];
 	}
 
-	// void resize_rows(size_t nrow_new) {
-
-	// if(void* mem = std::realloc(data_, nrow_new * ncol_))
-	// 	data_ = static_cast<char*>(mem);
-	// else
-	// 	throw std::bad_alloc();
- //        }
-
-	// // init array from shape and allocate memory
-	// Array2D(size_t shape[2])
-	// : nrow_(shape[0]), ncol_(shape[1]), size_(nrow_ * ncol_){
-	// 	shape_[0] = nrow_;
-	// 	shape_[1] = ncol_;
-	// 	data_ = new T[size_];
-	// }
 
 	~Array2D(){delete data_;}
 	// force move constructor
@@ -153,10 +138,9 @@ public:
 	}
 
 
-	// Return pointer to i'th row, segfaults for large arrays..
+	// Return pointer to i'th row
 	T* row(size_t irow) {
 		return data_ + (irow * ncol_);
-		// return data_ + (irow * ncol_);
 	}
 
 	// Return pointer to zeroth element
@@ -234,23 +218,6 @@ public:
 	}
 	~Grid(){}
 
-	// Array2D<float> build_points(){
-
-	// 	auto points = Array2D<float>(npts, 3);
-	// 	size_t ix = 0;		
-	// 	for (size_t i = 0; i < nz; ++i) {
-	// 		for (size_t j = 0; j < ny; ++j) {
-	// 			for (size_t k = 0; k < nx; ++k) {
-	// 				points.row(ix)[0] = xmin + k * spacing;
-	// 				points.row(ix)[1] = ymin + j * spacing;
-	// 				points.row(ix)[2] = zmin + i * spacing;
-	// 				ix++;
-	// 			}			
-	// 		}
-	// 	}
-	// 	return points;
-	// }
-
 
 	Array2D<float> build_points(){
 
@@ -294,23 +261,6 @@ public:
 		buf[1] = y;
 		buf[2] = z;
 	}
-
-	// std::vector<float, 3> get_point(size_t index){
-				
-	// 	ix = index % nx;
-	// 	iy = ((index - ix) / nx) % ny;
-	// 	iz = index / (nx * ny);
-
-	// 	x = ix * spacing + xmin;
-	// 	y = iy * spacing + ymin;
-	// 	z = iz * spacing + zmin;
-	// 	std::vector<float, 3> buf = {x, y, z};
-	// 	return buf;
-	// 	// buf[0] = x;
-	// 	// buf[1] = y;
-	// 	// buf[2] = z;
-	// }
-
 	
 };
 
@@ -359,7 +309,6 @@ struct Clock {
 		}
 	}	
 };
-
 
 
 // }
