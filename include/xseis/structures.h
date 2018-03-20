@@ -185,6 +185,18 @@ public:
 		}
 	}
 
+	Vector<T> copy_col(size_t icol) {
+
+		Vector<T> out = Vector<T>(nrow_);
+		
+		for (size_t i = 0; i < nrow_; ++i) {
+			out[i] = data_[i * ncol_ + icol];
+		}
+		
+		return out;	
+	}
+
+
 	void fill(T value){std::fill(data_, data_ + size_, value);}	
 };
 

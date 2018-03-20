@@ -210,9 +210,6 @@ void NaiveSearch(Array2D<float>& data, Array2D<uint16_t>& ttable, size_t tmin, s
 	// return std::make_tuple(&power, &locs);
 }
 
-
-
-
 // Uses constant velocity medium, introduce random errors
 Array2D<uint16_t> BuildTTablePerturbVel(Array2D<float>& stalocs, Array2D<float>& gridlocs, float vel, float sr, float perturb)
 {

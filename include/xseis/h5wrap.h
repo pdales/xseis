@@ -93,6 +93,13 @@ struct Dataset {
 		return arr;		
 	}
 
+	Array2D<double> load_double_array() {
+		auto arr = Array2D<double>({(size_t) nrow_, (size_t) ncol_});
+		H5::DataSpace mspace(rank_, shape_);
+		dset_.read(arr.data_, dtype_, mspace, filespace_);
+		return arr;		
+	}
+
 	Array2D<int> load_int_array() {
 		auto arr = Array2D<int>({(size_t) nrow_, (size_t) ncol_});
 		H5::DataSpace mspace(rank_, shape_);
