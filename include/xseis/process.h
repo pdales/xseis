@@ -211,6 +211,54 @@ void norm_one_bit(float *sig, size_t npts)
 	}
 }
 
+void norm_one_or_zero(float *sig, size_t npts)
+{
+	for (size_t i = 0; i < npts; ++i){
+		if(sig[i] <= 0) {
+			sig[i] = 0;
+		}
+		else{
+			sig[i] = 1;
+		}
+	}
+}
+
+
+void ExpMovingAverage(float *sig, size_t npts, uint wlen, bool both_ways=false)
+{
+	float alpha = 2 / (static_cast<float>(wlen) + 1);
+	float beta = 1 - alpha;
+	
+	sig[0] = std::abs(sig[0]);
+
+	for (size_t i = 1; i < npts; ++i){
+		sig[i] = alpha * std::abs(sig[i]) + beta * sig[i - 1];
+	}
+
+	if(both_ways == true) {
+		for (long i = npts - 2; i >= 0; --i){
+		sig[i] = alpha * std::abs(sig[i]) + beta * sig[i + 1];
+	}
+
+	}
+}
+
+
+// void ExpMovingAverageSquare(float *sig, size_t npts, uint wlen)
+// {
+// 	float alpha = 2 / (static_cast<float>(wlen) + 1);
+// 	float beta = 1 - alpha;
+	
+// 	sig[0] = sig[0] * sig[0];
+
+// 	for (size_t i = 1; i < npts; ++i){
+// 		sig[i] = alpha * sig[i] * sig[i] + beta * sig[i - 1];
+// 	}
+// }
+
+		// esig[i] = alpha * esig[i] + (1 - alpha) * esig[i - 1]
+
+
 // template<typename T>
 // bool abs_compare(T a, T b)
 bool abs_compare(float a, float b)

@@ -120,7 +120,7 @@ std::vector<uint32_t> gen_equal_parts(uint32_t ntot, uint32_t nthread)
 }
 
 
-void copy_slice(Array2D<float>& data_in, Vector<uint32_t>& keeprows, uint32_t offset, Array2D<float>& data_out)
+void CopyArrayDataOffsetKeys(Array2D<float>& data_in, Vector<uint32_t>& keeprows, uint32_t offset, Array2D<float>& data_out)
 {
 	float *start_out;
 	float *start_in;
