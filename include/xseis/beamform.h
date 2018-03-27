@@ -333,6 +333,27 @@ size_t NChoose2(size_t n)
 	return (n * (n-1)) / 2;
 }
 
+Array2D<uint16_t> unique_pairs(uint nsig)
+{
+	
+	auto ckeys = Array2D<uint16_t>(NChoose2(nsig), 2);
+	size_t row_ix = 0;
+
+	for (uint i = 0; i < nsig; ++i)
+	{
+		for (uint j = i + 1; j < nsig; ++j)
+		{
+			ckeys(row_ix, 0) = i;
+			ckeys(row_ix, 1) = j;
+			row_ix += 1;
+		}
+	}
+	std::cout << "row_ix: " << row_ix << '\n';
+	std::cout << "nkeys: " << ckeys.nrow_ << '\n';
+	return ckeys;
+}
+
+
 Array2D<uint16_t> unique_pairs(Vector<uint16_t>& keys)
 {
 	size_t npair = 0;

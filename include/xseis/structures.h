@@ -50,10 +50,10 @@ public:
 
 	void linspace(float start, float stop){
 		// size_ =  / step;
-		size_t step = (stop - start) / size_;
+		float step = (stop - start) / size_;
 
 		for (size_t i = 0; i < size_; ++i) {
-			data_[i] = start + i * step;
+			data_[i] = start + static_cast<size_t>(i * step);
 		}
 	}
 
