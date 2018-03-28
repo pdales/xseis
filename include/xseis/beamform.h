@@ -42,7 +42,6 @@ uint mod_floor(int a, int n) {
 Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint16_t nthreads)
 {
 	// Each thread given own output buffer to prevent cache invalidations
-	// todo: move output alloc outside of this
 
 	const size_t cclen = data_cc.ncol_;
 	const size_t ncc = data_cc.nrow_;
@@ -99,6 +98,7 @@ Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, 
 {
 	// Divide grid into chunks to prevent cache invalidations during writing (see Ben Baker migrate)
 	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
+	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
 
 	const size_t cclen = data_cc.ncol_;
 	const size_t ncc = data_cc.nrow_;
@@ -112,7 +112,7 @@ Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, 
 	auto output = Vector<float>(ngrid);
 	output.fill(0);
 
-	printf("blocksize %lu, ngrid %lu \n", blocksize, ngrid);
+	// printf("blocksize %lu, ngrid %lu \n", blocksize, ngrid);
 
 	#pragma omp parallel for private(tts_sta1, tts_sta2, cc_ptr, out_ptr, blocklen) num_threads(nthreads)
 	for(size_t iblock = 0; iblock < ngrid; iblock += blocksize) {

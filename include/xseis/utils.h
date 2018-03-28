@@ -256,6 +256,26 @@ void Write(std::string fname, std::vector<T> vec){
 }
 
 
+template <typename T>
+void AppendToFile(std::string fname, T value){
+
+	std::ofstream outfile;
+	outfile.open(fname, std::ios_base::app);
+	outfile << value << "\n";
+}
+
+template <typename T>
+void AppendToFile(std::string fname, std::vector<T> vec){
+
+	std::ofstream outfile;
+	outfile.open(fname, std::ios_base::app);
+	for(auto&& val : vec) {
+		outfile << val << " ";		
+	}
+	outfile << "\n";
+}
+
+
 void write_xyz_win(std::string fname, Array2D<uint32_t>& arr, Grid& grid){
 	// std::cout.precision(10);
 	std::ofstream myfile (fname);
