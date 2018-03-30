@@ -1,6 +1,5 @@
 /*
 Beamforming functions.
-
 */
 #ifndef BEAMFORM_H
 #define BEAMFORM_H
@@ -8,6 +7,7 @@ Beamforming functions.
 #include "xseis/process.h"
 #include "xseis/structures.h"
 #include <random>
+#include <omp.h>
 
 
 namespace beamform {
@@ -382,7 +382,7 @@ Array2D<uint16_t> unique_pairs(Vector<uint16_t>& keys)
 	return ckeys;
 }
 
-Array2D<uint16_t> BuildPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist)
+Array2D<uint16_t> AllPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist)
 {
 	// size_t npair = 0;
 	size_t npair_max = NChoose2(keys.size_);
@@ -419,6 +419,51 @@ Array2D<uint16_t> BuildPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& sta
 
 	return ckeys2;
 }
+
+Array2D<uint16_t> AllPairsDistAngleFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist)
+{
+	// size_t npair = 0;
+	size_t npair_max = NChoose2(keys.size_);
+	printf("max pairs %lu\n", npair_max);
+	auto ckeys = Array2D<uint16_t>(npair_max, 2);
+	size_t row_ix = 0;
+	float dist;
+	float* loc1 = nullptr;
+	float* loc2 = nullptr;
+	float angle;
+	
+	for (uint i = 0; i < keys.size_; ++i)
+	{
+		loc1 = stalocs.row(keys[i]);
+
+		for (uint j = i + 1; j < keys.size_; ++j)
+		{
+			loc2 = stalocs.row(keys[j]);
+			dist = DistCartesian(loc1, loc2);
+			// printf("[%u,%u] %.2f \n",i, j, dist);
+
+			if (dist > min_dist && dist < max_dist)
+			{	
+				angle = AngleBetweenPoints(loc1, loc2);
+
+				if(angle < -0.14 || angle > -0.10) {
+					ckeys(row_ix, 0) = keys[i];
+					ckeys(row_ix, 1) = keys[j];
+					row_ix += 1;
+				}
+			}			
+		}
+	}
+
+	auto ckeys2 = Array2D<uint16_t>(row_ix, 2);
+	for(uint i = 0; i < ckeys2.size_; ++i) {
+		ckeys2[i] = ckeys[i];
+	}
+
+	return ckeys2;
+}
+
+
 
 Array2D<uint16_t> BuildNPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist, uint ncc)
 {
@@ -527,6 +572,69 @@ uint TotalNPairsDistAngleFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, f
 	return ncc;
 }
 
+
+
+Vector<uint16_t> GetStationKeysNear(Vector<float>& loc, Array2D<float>& stalocs, float max_dist) {
+
+	std::vector<uint16_t> stakeep;
+	float dist;
+
+	for(size_t i = 0; i < stalocs.nrow_; ++i) {
+
+		dist = DistCartesian2D(loc.data_, stalocs.row(i));		
+		if(dist < max_dist) {
+			stakeep.push_back(i);
+		}
+	}
+	auto out = Vector<uint16_t>(stakeep);
+
+	return out;
+}
+
+Vector<float> DistDiffFromCkeys(Array2D<uint16_t>& ckeys, Array2D<float>& stalocs, float sr) {
+
+	auto dist_diff = Vector<float>(ckeys.nrow_);
+
+	uint16_t *ckp = nullptr;
+
+	for(size_t i = 0; i < ckeys.nrow_; ++i) {
+		ckp = ckeys.row(i);
+
+		dist_diff[i] = DistCartesian(stalocs.row(ckp[0]), stalocs.row(ckp[1]));
+		
+	}
+	return dist_diff;
+}
+
+
+// Array2D<float> EnergyCC(Array2D<float>& data_cc) {
+// 	/* code */
+// }
+
+// auto energy_cc = Array2D<float>(data_cc.nrow_, 4);
+
+// 		float e1;
+// 		float e2;
+// 		float enoise1;
+// 		float enoise2;
+// 		float *sig = nullptr;
+// 		uint ixp;
+// 		uint hlen = npts / 2;
+
+// 		for(size_t i = 0; i < data_cc.nrow_; ++i) {
+// 			sig = data_cc.row(i);
+// 			ixp = ixphys[i];
+// 			printf("%d\n", i);
+// 			enoise1 = process::rms_energy(sig + ixp, hlen - ixp);
+// 			enoise2 = process::rms_energy(sig + hlen, hlen - ixp);
+// 			e1 = process::rms_energy(sig, ixphys[i]);
+// 			e2 = process::rms_energy(sig + npts - ixphys[i], npts);
+// 			energy_cc(i, 0) = e1;
+// 			energy_cc(i, 1) = e2;
+// 			energy_cc(i, 2) = enoise1;
+// 			energy_cc(i, 3) = enoise2;
+// 		}
+		
 
 
 // void tt_homo_ix(Array2D<float> &sta_locs, float *src_loc, float vsr, Vector<size_t> &tts)

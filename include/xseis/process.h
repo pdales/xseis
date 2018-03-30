@@ -21,7 +21,7 @@ Seems that c++ vectorizes by default when optimizations on.
 #include <thread>
 #include <functional>
 #include <chrono>
-#include <omp.h>
+// #include <omp.h>
 
 #include "xseis/structures.h"
 
@@ -176,6 +176,19 @@ void root_signal(float *sig, size_t npts)
 }
 
 
+float rms_energy(float *sig, size_t npts)
+{
+// np.sqrt(np.mean(data ** 2, axis=axis))
+
+	float square_sum = 0;
+	for (size_t i = 0; i < npts; ++i){
+		square_sum += sig[i] * sig[i];
+	}
+
+	return std::sqrt(square_sum / npts);
+}
+
+
 
 void multiply(float *sig, size_t npts, float factor){
 	for (size_t i = 0; i < npts; ++i){
@@ -243,6 +256,12 @@ void ExpMovingAverage(float *sig, size_t npts, uint wlen, bool both_ways=false)
 	}
 }
 
+float median(float *sig, size_t npts)
+{
+    size_t half = npts / 2;
+    std::nth_element(sig, sig + half, sig + npts);
+    return sig[half];
+}
 
 // void ExpMovingAverageSquare(float *sig, size_t npts, uint wlen)
 // {
@@ -273,6 +292,47 @@ void norm_max_abs(float *sig, size_t npts)
 	if (max != 0){
 		for (size_t i = 0; i < npts; ++i){
 			sig[i] /= max;
+		}
+	}
+}
+
+void zero_around_max(float *sig, size_t npts, size_t wlen)
+{	
+	// size_t amax = std::distance(sig, std::max_element(sig, sig + npts));	
+	// size_t hlen = wlen / 2;
+
+	// size_t cutmin = std::max(amax - hlen, (size_t) 0);
+	// size_t cutmax = std::min(amax + hlen, (size_t) npts);
+
+	// for(size_t i = cutmin; i < cutmax; ++i) {
+	// 	sig[i] = 0;
+	// }
+
+	long amax = std::distance(sig, std::max_element(sig, sig + npts));	
+	long hlen = wlen / 2;
+
+	long cutmin = amax - hlen;
+	long cutmax = amax + hlen;
+
+	if(cutmin >= 0 && cutmax <= npts) {
+		for(size_t i = cutmin; i < cutmax; ++i) {
+			sig[i] = 0;
+		}	
+	}
+	else if (cutmin < 0){
+		for(size_t i = npts + cutmin; i < npts; ++i) {
+			sig[i] = 0;
+		}
+		for(size_t i = 0; i < cutmax; ++i) {
+			sig[i] = 0;
+		}
+	}
+	else if (cutmax > npts){
+		for(size_t i = cutmin; i < npts; ++i) {
+			sig[i] = 0;
+		}
+		for(size_t i = 0; i < cutmax - npts; ++i) {
+			sig[i] = 0;
 		}
 	}
 }
@@ -322,6 +382,17 @@ float standard_deviation(T *data, size_t size) {
 
 	var /= size;
 	return std::sqrt(var);
+}
+
+template<typename T>
+float mean(T *data, size_t size) {
+
+	float mean = 0;
+	for(size_t i = 0; i < size; ++i) {
+		mean += data[i];
+	}
+	mean /= size;
+	return mean;	
 }
 
 

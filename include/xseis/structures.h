@@ -25,7 +25,16 @@ public:
 
 	Vector() {}
 	Vector(T *data, size_t size): data_(data), size_(size) {}
-	Vector(size_t size): size_(size) {data_ = new T[size_]();}
+
+	Vector(size_t size): size_(size) {data_ = new T[size_];}
+
+	Vector(std::vector<T> vec): size_(vec.size()){
+		data_ = new T[size_];
+		for(size_t i = 0; i < size_; ++i) {
+			data_[i] = vec[i];
+		}
+
+	} 
 	
 	~Vector(){delete data_;}
 	Vector(Vector&&) = default;
@@ -50,10 +59,10 @@ public:
 
 	void linspace(float start, float stop){
 		// size_ =  / step;
-		float step = (stop - start) / size_;
+		float step = (stop - start) / static_cast<float>(size_);
 
 		for (size_t i = 0; i < size_; ++i) {
-			data_[i] = start + static_cast<size_t>(i * step);
+			data_[i] = start + step * static_cast<float>(i);
 		}
 	}
 
@@ -187,13 +196,22 @@ public:
 
 	Vector<T> copy_col(size_t icol) {
 
-		Vector<T> out = Vector<T>(nrow_);
+		Vector<T> vcopy = Vector<T>(nrow_);
 		
 		for (size_t i = 0; i < nrow_; ++i) {
-			out[i] = data_[i * ncol_ + icol];
+			vcopy[i] = data_[i * ncol_ + icol];
 		}
 		
-		return out;	
+		return vcopy;	
+	}
+
+	Vector<T> copy_row(size_t irow) {
+
+		Vector<T> vcopy = Vector<T>(ncol_);
+		T *start = data_ + irow * ncol_;
+
+		std::copy(start, start + ncol_, vcopy.data_);
+		return vcopy;		
 	}
 
 
