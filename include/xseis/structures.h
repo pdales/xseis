@@ -20,34 +20,62 @@ ndim array library.
 template <typename T>
 class Vector {	
 public:
-	T *data_ = nullptr;
 	size_t size_ = 0;
+	T *data_ = nullptr;
+	bool owns_ = true;
+
 
 	Vector() {}
-	Vector(T *data, size_t size): data_(data), size_(size) {}
+	// init from existing c-array with optional ownership
+	Vector(T *data, size_t size, bool owns=true)
+	:size_(size), data_(data), owns_(owns)
+	{}
 
-	Vector(size_t size): size_(size) {data_ = new T[size_];}
+	// init and allocate dynamic memory
+	Vector(size_t size)
+	: size_(size), data_(size_ ? new T[size_]() : nullptr), owns_(true)
+	{}
 
-	Vector(std::vector<T> vec): size_(vec.size()){
-		data_ = new T[size_];
-		for(size_t i = 0; i < size_; ++i) {
-			data_[i] = vec[i];
-		}
-
+	// init from std::vector, copies data
+	Vector(std::vector<T>& vec): size_(vec.size()), data_(new T[size_]()), owns_(true){
+		std::copy(vec.begin(), vec.end(), data_);
 	} 
-	
-	~Vector(){delete data_;}
-	Vector(Vector&&) = default;
 
-	Vector<T> copy()
+
+	// destructor
+	~Vector(){if (owns_ == true) {delete [] data_;}}
+	
+	// copy-assignment contructor
+	Vector(const Vector& other) : size_(other.size_),
+		  data_(size_ ? new T[size_]() : nullptr), owns_(true)
 	{
-		auto vcopy = Vector<T>(size_);
-		std::copy(data_, data_ + size_, vcopy.data_);
-		return vcopy;
+		std::cout << "Warning: copying Vector of size " << size_ << '\n';
+		std::copy(other.data_, other.data_ + size_, data_);
 	}
 
+	// helper for move-constructor and assignment operator
+	friend void swap(Vector& first, Vector& second) // nothrow
+	{
+		// https://stackoverflow.com/questions/3279543/what-is-the-copy-and-swap-idiom
+		using std::swap;
+		swap(first.size_, second.size_);
+		swap(first.data_, second.data_);
+	}
 
-	void set_dptr(T* arg) {data_ = arg;}
+	// overload assignment operator
+	Vector& operator=(Vector other)
+	{
+		swap(*this, other); 
+
+		return *this;
+	}
+
+	// move constructor
+	Vector(Vector&& other)
+		: Vector() 
+	{
+		swap(*this, other);
+	}
 
 	void arange(T start, T stop, T step){
 		size_t size = (stop - start) / step;
@@ -108,34 +136,89 @@ public:
 template <typename T>
 class Array2D {
 public:
-	T *data_ = nullptr;
-	size_t nrow_, ncol_;
+	// std::unique_ptr<T> data_ = nullptr;
+	size_t nrow_ = 0;
+	size_t ncol_ = 0;
 	size_t size_ = 0;
-	size_t shape_[2];
+	// size_t shape_[2];
+	T *data_ = nullptr;
+	bool owns_ = true;
 
-	// // Array2D() {}
-	// // init from existing allocated memory - deprecated
-	Array2D(T *data, size_t nrow, size_t ncol)
-	:data_(data), nrow_(nrow), ncol_(ncol) 
-	{
-		size_ = (size_t) nrow_ * ncol_;
-		shape_[0] = nrow_;
-		shape_[1] = ncol_;
-	}
 
-	// init array and allocate memory
+	// default constructor
+	Array2D() {}
+
+	// init from existing c-array with optional ownership
+	Array2D(T *data, size_t nrow, size_t ncol, bool owns=true)	 
+	:data_(data), nrow_(nrow), ncol_(ncol), size_(nrow * ncol), owns_(owns)
+	{}
+
+	// init and allocate dynamic memory
 	Array2D(size_t nrow, size_t ncol)
-	: nrow_(nrow), ncol_(ncol){
+	: nrow_(nrow), ncol_(ncol), owns_(true){
 		size_ = (size_t) nrow_ * ncol_;
-		shape_[0] = nrow_;
-		shape_[1] = ncol_;
-		data_ = new T[size_];
+		data_ = size_ ? new T[size_]() : nullptr;
+	}
+
+	// init from std::vector, copies data
+	Array2D(std::vector<T>& vec, size_t ncol): nrow_(vec.size() / ncol), ncol_(ncol), size_(vec.size()), owns_(true){
+		data_ = new T[size_]();
+		std::copy(vec.begin(), vec.end(), data_);
+	} 
+
+
+	// destructor
+	~Array2D(){if (owns_ == true) {delete [] data_;}}
+	
+	// copy-assignment contructor (needed to create std::vector of arrays)
+	Array2D(const Array2D& other) : nrow_(other.nrow_), ncol_(other.ncol_), size_(other.size_),
+		  data_(size_ ? new T[size_]() : nullptr), owns_(true)
+	{
+		std::copy(other.data_, other.data_ + size_, data_);
+		std::cout << "Warning: copying Array2D of size " << size_ << '\n';
+	}
+
+	// helper for move-constructor and assignment operator
+	friend void swap(Array2D& first, Array2D& second) // nothrow
+	{
+		// https://stackoverflow.com/questions/3279543/what-is-the-copy-and-swap-idiom
+		using std::swap;
+		// std::cout << "MOVING:********************" << second.size_ << '\n';
+		swap(first.nrow_, second.nrow_);
+		swap(first.ncol_, second.ncol_);
+		swap(first.size_, second.size_);
+		swap(first.data_, second.data_);
+	}
+
+	// overload assignment operator
+	Array2D& operator=(Array2D other)
+	{
+		swap(*this, other); 
+		return *this;
+	}
+
+	// move constructor
+	Array2D(Array2D&& other)
+		: Array2D() 
+	{
+		swap(*this, other);
 	}
 
 
-	~Array2D(){delete data_;}
-	// force move constructor
-	Array2D(Array2D&&) = default;
+
+	// Array2D(const Array2D &that) {
+	// 	nrow_ = that.nrow_;
+	// 	ncol_ = that.ncol_;
+	// 	size_ = that.size_;
+	// 	shape_[0] = nrow_;
+	// 	shape_[1] = ncol_;
+	// 	// data_ = that.data_;
+	// 	// owns_ = false;
+	// 	data_ = new T[size_];
+	// 	std::copy(that.data_, that.data_ + size_, data_);
+	// 	// data_ = that.data_;
+	// 	owns_ = true;		
+	// }
 
 	// Get value at flattened index ix
 	T& operator[] (size_t ix){return data_[ix];}
@@ -214,9 +297,24 @@ public:
 		return vcopy;		
 	}
 
+	Vector<T> row_view(size_t irow) {
+
+		T *start = data_ + irow * ncol_;
+		Vector<T> vec = Vector<T>(start, ncol_, false);
+		return vec;		
+	}
+
+	// Array2D<T> copy()
+	// {
+	// 	auto acopy = Array2D<T>(nrow_, ncol_);
+	// 	std::copy(data_, data_ + size_, acopy.data_);
+	// 	return acopy;
+	// }
+
 
 	void fill(T value){std::fill(data_, data_ + size_, value);}	
 };
+
 
 
 class Grid {

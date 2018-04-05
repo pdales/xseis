@@ -12,6 +12,36 @@
 #include "xseis/structures.h"
 namespace utils {
 
+// copy-assignment contructor (needed to create std::vector of arrays)
+// template<typename T>
+// Array2D(const Array2D& other) : nrow_(other.nrow_), ncol_(other.ncol_), size_(other.size_),
+// 	  data_(size_ ? new T[size_]() : nullptr), owns_(true)
+// {
+// 	std::copy(other.data_, other.data_ + size_, data_);
+// 	std::cout << "Warning: copying Array2D of size " << size_ << '\n';
+// }
+
+
+// template<typename T>
+// Array2D<T> ConcatenateRows(Array2D<T>& a1, Array2D<T>& a2) {
+	
+// 	size_t nrow = a1.nrow_ + a2.nrow_;
+// 	size_t ncol = a1.ncol_;
+
+// 	auto ac = Array2D<T>(nrow, ncol);
+
+// 	float *drow = nullptr;
+// 	for(unsigned i = 0; i < keys.size_; ++i) {
+// 		drow = data.row(kc[i]);
+// 		std::copy(drow, drow + data.ncol_, dnew.row(i));		
+// 	}
+
+// 	return dnew;
+
+// }
+
+
+
 
 // Set first N elements of array with randomly chosen elements
 template<class BidiIter >
@@ -341,7 +371,7 @@ void PrintArraySize(Array2D<T>& arr, std::string tag){
 	// printf("type size %.1f bytes \n", (float) sizeof(arr[0]));
 }
 
-std::string ZeroPadInt(unsigned val, unsigned npad){
+std::string ZeroPadInt(unsigned val, unsigned npad=5){
 	std::stringstream ss;
 	ss << std::setw(npad) << std::setfill('0') << val;
 	return ss.str();

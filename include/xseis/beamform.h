@@ -94,7 +94,7 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 
 
 
-Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint nthreads, size_t blocksize)
+Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, size_t blocksize=1024 * 5, float scale_pwr=100)
 {
 	// Divide grid into chunks to prevent cache invalidations during writing (see Ben Baker migrate)
 	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
@@ -114,7 +114,7 @@ Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, 
 
 	// printf("blocksize %lu, ngrid %lu \n", blocksize, ngrid);
 
-	#pragma omp parallel for private(tts_sta1, tts_sta2, cc_ptr, out_ptr, blocklen) num_threads(nthreads)
+	#pragma omp parallel for private(tts_sta1, tts_sta2, cc_ptr, out_ptr, blocklen)
 	for(size_t iblock = 0; iblock < ngrid; iblock += blocksize) {
 
 		blocklen = std::min(ngrid - iblock, blocksize);
@@ -147,6 +147,77 @@ Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, 
 			}
 		}
 
+	}	
+
+	float norm = scale_pwr / static_cast<float>(ncc);	
+	for(size_t i = 0; i < output.size_; ++i) {
+		output[i] *= norm;
+	}
+
+	// printf("completed\n");	
+	return output;
+}
+
+
+
+Vector<float> InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, size_t blocksize=1024 * 5, float scale_pwr=100)
+{
+	// Divide grid into chunks to prevent cache invalidations during writing (see Ben Baker migrate)
+	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
+	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
+
+	const size_t cclen = data_cc.ncol_;
+	// const size_t ncc = data_cc.nrow_;
+	const size_t ngrid = ttable.ncol_;
+	size_t blocklen;
+
+	uint16_t *tts_sta1, *tts_sta2;
+	float *cc_ptr = nullptr;
+	float *out_ptr = nullptr;
+
+	auto output = Vector<float>(ngrid);
+	output.fill(0);
+
+	// printf("blocksize %lu, ngrid %lu \n", blocksize, ngrid);
+
+	#pragma omp parallel for private(tts_sta1, tts_sta2, cc_ptr, out_ptr, blocklen) 
+	for(size_t iblock = 0; iblock < ngrid; iblock += blocksize) {
+
+		blocklen = std::min(ngrid - iblock, blocksize);
+
+		out_ptr = output.data_ + iblock;
+		// out_ptr = output.data_ + iblock * blocklen;
+		// std::fill(out_ptr, out_ptr + blocklen, 0);
+		// for (size_t i = 0; i < ncc; ++i)
+		for(auto&& i : ix_patch) {
+
+			tts_sta1 = ttable.row(ckeys(i, 0)) + iblock;	
+			tts_sta2 = ttable.row(ckeys(i, 1)) + iblock;
+			cc_ptr = data_cc.row(i);
+
+			// Migrate single ccf on to grid based on tt difference
+			#pragma omp simd \
+			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+			for (size_t j = 0; j < blocklen; ++j)
+			{
+				// Get appropriate ix of unrolled ccfs (same as mod_floor)
+				// by wrapping negative traveltime differences
+				if (tts_sta2[j] >= tts_sta1[j])
+				{
+					out_ptr[j] += cc_ptr[tts_sta2[j] - tts_sta1[j]];					
+				}
+				else
+				{
+					out_ptr[j] += cc_ptr[cclen - tts_sta1[j] + tts_sta2[j]];
+				}
+			}
+		}
+
+	}
+
+	float norm = scale_pwr / static_cast<float>(ix_patch.size());	
+	for(size_t i = 0; i < output.size_; ++i) {
+		output[i] *= norm;
 	}
 	// printf("completed\n");	
 	return output;
@@ -382,6 +453,24 @@ Array2D<uint16_t> unique_pairs(Vector<uint16_t>& keys)
 	return ckeys;
 }
 
+std::vector<uint16_t> UniquePairsFlat(Vector<uint16_t>& keys)
+{
+
+	std::vector<uint16_t> ckeys;
+	// auto ckeys = Array2D<uint16_t>(npair, 2);
+	size_t row_ix = 0;
+
+	for (uint i = 0; i < keys.size_; ++i)
+	{
+		for (uint j = i + 1; j < keys.size_; ++j)
+		{
+			ckeys.push_back(keys[i]);
+			ckeys.push_back(keys[j]);
+		}
+	}
+	return ckeys;
+}
+
 Array2D<uint16_t> AllPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist)
 {
 	// size_t npair = 0;
@@ -472,7 +561,7 @@ Array2D<uint16_t> BuildNPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& st
 	std::mt19937::result_type seed = time(0);
 	auto rand_int = std::bind(std::uniform_int_distribution<uint>(0, keys.size_), std::mt19937(seed));
 
-	uint16_t k1, k2; 
+	uint16_t k1, k2;
 	float dist;
 	float* loc1 = nullptr;
 	float* loc2 = nullptr;
@@ -605,6 +694,37 @@ Vector<float> DistDiffFromCkeys(Array2D<uint16_t>& ckeys, Array2D<float>& staloc
 	}
 	return dist_diff;
 }
+
+std::vector<float> MaxAndLoc(Vector<float>& power, Array2D<float>& gridlocs) {
+
+	size_t amax = std::distance(power.data_,
+			 std::max_element(power.begin(), power.end()));
+
+	// float max = output.max();
+	// size_t amax = output.argmax();
+	float *wloc = gridlocs.row(amax);
+
+	std::vector<float> stats = {power[amax], wloc[0], wloc[1], wloc[2]};
+	return stats;
+}
+
+
+
+// std::vector<uint16_t> GetStationKeysNear(Vector<float>& loc, Array2D<float>& stalocs, float max_dist) {
+
+// 	std::vector<uint16_t> stakeep;
+// 	float dist;
+
+// 	for(size_t i = 0; i < stalocs.nrow_; ++i) {
+
+// 		dist = DistCartesian2D(loc.data_, stalocs.row(i));		
+// 		if(dist < max_dist) {
+// 			stakeep.push_back(i);
+// 		}
+// 	}
+// 	// auto out = Vector<uint16_t>(stakeep);
+// 	return stakeep;
+// }
 
 
 // Array2D<float> EnergyCC(Array2D<float>& data_cc) {

@@ -23,10 +23,10 @@ def v2color(vals):
 	return clrs
 
 
-def plot_stations(locs, ckeys=None, vals=None, alpha=0.3, lstep=100):
+def stations(locs, ckeys=None, vals=None, alpha=0.3, lstep=100):
 	locs = locs[:, :2]
 	x, y = locs.T
-	plt.scatter(x, y, alpha=0.5, s=6)
+	plt.scatter(x, y, alpha=alpha, s=6)
 	# x, y, z = locs[2900:3100].T
 	for i in range(0, locs.shape[0], lstep):
 		plt.text(x[i], y[i], i)
