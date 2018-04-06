@@ -33,6 +33,32 @@ const uint MEM_ALIGNMENT = 16;
 namespace process {
 
 
+inline float AngleBetweenPoints(float* a, float*b) 
+{
+	return std::atan((a[1] - b[1]) / (a[0] - b[0]));
+	// return std::atan2(a[1] - b[1], a[0] - b[0]);
+}
+
+inline float DistCartesian(float* a, float* b)
+{	
+	float dx = a[0] - b[0];
+	float dy = a[1] - b[1];
+	float dz = a[2] - b[2];
+	return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+inline float DistCartesian2D(float* a, float* b)
+{	
+	float dx = a[0] - b[0];
+	float dy = a[1] - b[1];
+	return std::sqrt(dx * dx + dy * dy);
+}
+
+uint mod_floor(int a, int n) {
+	return ((a % n) + n) % n;
+}
+
+
 // Cross-correlate complex signals, cc(f) = s1(f) x s2*(f)
 #pragma omp declare simd aligned(sig1, sig2, out:MEM_ALIGNMENT)
 void XCorr(fftwf_complex* sig1, fftwf_complex* sig2, fftwf_complex* out, uint32_t nfreq)

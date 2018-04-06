@@ -12,7 +12,7 @@ import os
 from scipy import fftpack
 
 from matplotlib.pyplot import rcParams
-rcParams['figure.figsize'] = 10, 6
+rcParams['figure.figsize'] = 11, 8
 
 
 def v2color(vals):
@@ -23,13 +23,14 @@ def v2color(vals):
 	return clrs
 
 
-def stations(locs, ckeys=None, vals=None, alpha=0.3, lstep=100):
+def stations(locs, ckeys=None, vals=None, alpha=0.3, lstep=100, pkeys=None):
 	locs = locs[:, :2]
 	x, y = locs.T
-	plt.scatter(x, y, alpha=alpha, s=6)
+	plt.scatter(x, y, alpha=alpha, s=6, zorder=0)
 	# x, y, z = locs[2900:3100].T
-	for i in range(0, locs.shape[0], lstep):
-		plt.text(x[i], y[i], i)
+	if lstep != 0:
+		for i in range(0, locs.shape[0], lstep):
+			plt.text(x[i], y[i], i)
 
 	if ckeys is not None:
 		if vals is not None:
@@ -40,7 +41,12 @@ def stations(locs, ckeys=None, vals=None, alpha=0.3, lstep=100):
 		else:
 			for ck in ckeys:
 				x, y = locs[ck].T
-				plt.plot(x, y, alpha=alpha, color='black')
+				plt.plot(x, y, alpha=alpha, color='black', zorder=1)
+
+	if pkeys is not None:
+		x, y = locs[pkeys].T
+		plt.scatter(x, y, s=100, color='red', zorder=2)
+
 	plt.axis('equal')
 	plt.show()
 

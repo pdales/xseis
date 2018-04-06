@@ -13,32 +13,6 @@ Beamforming functions.
 namespace beamform {
 
 
-inline float AngleBetweenPoints(float* a, float*b) 
-{
-	return std::atan((a[1] - b[1]) / (a[0] - b[0]));
-	// return std::atan2(a[1] - b[1], a[0] - b[0]);
-}
-
-inline float DistCartesian(float* a, float* b)
-{	
-	float dx = a[0] - b[0];
-	float dy = a[1] - b[1];
-	float dz = a[2] - b[2];
-	return std::sqrt(dx * dx + dy * dy + dz * dz);
-}
-
-inline float DistCartesian2D(float* a, float* b)
-{	
-	float dx = a[0] - b[0];
-	float dy = a[1] - b[1];
-	return std::sqrt(dx * dx + dy * dy);
-}
-
-uint mod_floor(int a, int n) {
-	return ((a % n) + n) % n;
-}
-
-
 Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint16_t nthreads)
 {
 	// Each thread given own output buffer to prevent cache invalidations
@@ -167,7 +141,6 @@ Vector<float> InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, s
 	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
 
 	const size_t cclen = data_cc.ncol_;
-	// const size_t ncc = data_cc.nrow_;
 	const size_t ngrid = ttable.ncol_;
 	size_t blocklen;
 
@@ -302,7 +275,7 @@ Array2D<uint16_t> BuildTTablePerturbVel(Array2D<float>& stalocs, Array2D<float>&
 
 		for (size_t j = 0; j < ttable.ncol_; ++j) 
 		{
-			dist = DistCartesian(sloc, gridlocs.row(j));			
+			dist = process::DistCartesian(sloc, gridlocs.row(j));			
 			tt_row[j] = static_cast<uint16_t>(dist * sr / rand() + 0.5);
 		}
 	}
@@ -328,7 +301,7 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 
 		for (size_t j = 0; j < ttable.ncol_; ++j) 
 		{
-			dist = DistCartesian(sloc, gridlocs.row(j));			
+			dist = process::DistCartesian(sloc, gridlocs.row(j));			
 			tt_row[j] = static_cast<uint16_t>(dist * vsr + 0.5);
 		}
 	}
@@ -373,7 +346,7 @@ Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& 
 
 		for (size_t j = 0; j < ngrid; ++j) 
 		{	
-			dist = DistCartesian(sloc, gridlocs.row(j));
+			dist = process::DistCartesian(sloc, gridlocs.row(j));
 			tt_row[j] = static_cast<uint16_t>(dist * vsr_grid[j] + 0.5);
 		}
 	}
@@ -391,7 +364,7 @@ Vector<uint16_t> GetTTOneToMany(float* loc_src, Array2D<float>& locs, float vel,
 
 	for (size_t j = 0; j < nlocs; ++j) 
 	{	
-		dist = DistCartesian(loc_src, locs.row(j));
+		dist = process::DistCartesian(loc_src, locs.row(j));
 		tts[j] = static_cast<uint16_t>(dist * vsr + 0.5);
 	}
 
@@ -457,8 +430,6 @@ std::vector<uint16_t> UniquePairsFlat(Vector<uint16_t>& keys)
 {
 
 	std::vector<uint16_t> ckeys;
-	// auto ckeys = Array2D<uint16_t>(npair, 2);
-	size_t row_ix = 0;
 
 	for (uint i = 0; i < keys.size_; ++i)
 	{
@@ -470,6 +441,50 @@ std::vector<uint16_t> UniquePairsFlat(Vector<uint16_t>& keys)
 	}
 	return ckeys;
 }
+
+std::vector<uint16_t> AllPairsFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist, float min_ang=-0.14, float max_ang=-0.10)
+{
+	// size_t npair = 0;
+	// size_t npair_max = NChoose2(keys.size_);
+	// printf("max pairs %lu\n", npair_max);
+	// auto ckeys = Array2D<uint16_t>(npair_max, 2);
+	// size_t nfill = 0;
+	// std::vector<uint16_t> ckeys(NChoose2(keys.size_) / 2);
+	std::vector<uint16_t> ckeys;
+
+	float* loc1 = nullptr;
+	float* loc2 = nullptr;
+	float angle;
+	float dist;
+	
+	for (uint i = 0; i < keys.size_; ++i)
+	{
+		loc1 = stalocs.row(keys[i]);
+
+		for (uint j = i + 1; j < keys.size_; ++j)
+		{
+			loc2 = stalocs.row(keys[j]);
+			dist = process::DistCartesian(loc1, loc2);
+			// printf("[%u,%u] %.2f \n",i, j, dist);
+
+			if (dist > min_dist && dist < max_dist)
+			{	
+				angle = process::AngleBetweenPoints(loc1, loc2);
+
+				if(min_ang < angle && angle < max_ang) {
+					continue;
+				}
+				else{
+					ckeys.push_back(keys[i]);
+					ckeys.push_back(keys[j]);					
+				}
+			}			
+		}
+	}
+
+	return ckeys;
+}
+
 
 Array2D<uint16_t> AllPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist)
 {
@@ -489,7 +504,7 @@ Array2D<uint16_t> AllPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& stalo
 		for (uint j = i + 1; j < keys.size_; ++j)
 		{
 			loc2 = stalocs.row(keys[j]);
-			dist = DistCartesian(loc1, loc2);
+			dist = process::DistCartesian(loc1, loc2);
 			// printf("[%u,%u] %.2f \n",i, j, dist);
 			if (dist > min_dist && dist < max_dist)
 			{
@@ -528,12 +543,12 @@ Array2D<uint16_t> AllPairsDistAngleFilt(Vector<uint16_t>& keys, Array2D<float>& 
 		for (uint j = i + 1; j < keys.size_; ++j)
 		{
 			loc2 = stalocs.row(keys[j]);
-			dist = DistCartesian(loc1, loc2);
+			dist = process::DistCartesian(loc1, loc2);
 			// printf("[%u,%u] %.2f \n",i, j, dist);
 
 			if (dist > min_dist && dist < max_dist)
 			{	
-				angle = AngleBetweenPoints(loc1, loc2);
+				angle = process::AngleBetweenPoints(loc1, loc2);
 
 				if(angle < -0.14 || angle > -0.10) {
 					ckeys(row_ix, 0) = keys[i];
@@ -573,7 +588,7 @@ Array2D<uint16_t> BuildNPairsDistFilt(Vector<uint16_t>& keys, Array2D<float>& st
 		if(k1 != k2) {
 			loc1 = stalocs.row(keys[k1]);
 			loc2 = stalocs.row(keys[k2]);
-			dist = DistCartesian(loc1, loc2);
+			dist = process::DistCartesian(loc1, loc2);
 			// printf("[%u,%u] %.2f \n",i, j, dist);
 			if (dist > min_dist && dist < max_dist)
 			{	
@@ -607,11 +622,11 @@ Array2D<uint16_t> BuildNPairsDistAngleFilt(Vector<uint16_t>& keys, Array2D<float
 		if(k1 != k2) {
 			loc1 = stalocs.row(keys[k1]);
 			loc2 = stalocs.row(keys[k2]);
-			dist = DistCartesian(loc1, loc2);
+			dist = process::DistCartesian(loc1, loc2);
 			// printf("[%u,%u] %.2f \n",i, j, dist);
 			if (dist > min_dist && dist < max_dist)
 			{	
-				angle = AngleBetweenPoints(loc1, loc2);
+				angle = process::AngleBetweenPoints(loc1, loc2);
 
 				if(angle < -0.14 || angle > -0.10) {
 					ckeys.row(i)[0] = keys[k1];
@@ -645,11 +660,11 @@ uint TotalNPairsDistAngleFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, f
 			ntot++;	
 			loc1 = stalocs.row(keys[i]);
 			loc2 = stalocs.row(keys[j]);
-			dist = DistCartesian(loc1, loc2);
+			dist = process::DistCartesian(loc1, loc2);
 			// printf("[%u,%u] %.2f \n",i, j, dist);
 			if (dist > min_dist && dist < max_dist)
 			{	
-				angle = AngleBetweenPoints(loc1, loc2);
+				angle = process::AngleBetweenPoints(loc1, loc2);
 
 				if(angle < -0.14 || angle > -0.10) {					
 					ncc++;
@@ -670,7 +685,7 @@ Vector<uint16_t> GetStationKeysNear(Vector<float>& loc, Array2D<float>& stalocs,
 
 	for(size_t i = 0; i < stalocs.nrow_; ++i) {
 
-		dist = DistCartesian2D(loc.data_, stalocs.row(i));		
+		dist = process::DistCartesian2D(loc.data_, stalocs.row(i));		
 		if(dist < max_dist) {
 			stakeep.push_back(i);
 		}
@@ -689,7 +704,7 @@ Vector<float> DistDiffFromCkeys(Array2D<uint16_t>& ckeys, Array2D<float>& staloc
 	for(size_t i = 0; i < ckeys.nrow_; ++i) {
 		ckp = ckeys.row(i);
 
-		dist_diff[i] = DistCartesian(stalocs.row(ckp[0]), stalocs.row(ckp[1]));
+		dist_diff[i] = process::DistCartesian(stalocs.row(ckp[0]), stalocs.row(ckp[1]));
 		
 	}
 	return dist_diff;
@@ -717,7 +732,7 @@ std::vector<float> MaxAndLoc(Vector<float>& power, Array2D<float>& gridlocs) {
 
 // 	for(size_t i = 0; i < stalocs.nrow_; ++i) {
 
-// 		dist = DistCartesian2D(loc.data_, stalocs.row(i));		
+// 		dist = process::DistCartesian2D(loc.data_, stalocs.row(i));		
 // 		if(dist < max_dist) {
 // 			stakeep.push_back(i);
 // 		}
@@ -761,7 +776,7 @@ std::vector<float> MaxAndLoc(Vector<float>& power, Array2D<float>& gridlocs) {
 // {	
 // 	float dist;
 // 	for (size_t j = 0; j < tts.size_; ++j) {
-// 		dist = beamform::DistCartesian(src_loc, sta_locs.row(j));
+// 		dist = beamform::process::DistCartesian(src_loc, sta_locs.row(j));
 // 		tts[j] = static_cast<size_t>(dist * vsr + 0.5);
 // 	}
 // }
@@ -772,8 +787,8 @@ std::vector<float> MaxAndLoc(Vector<float>& power, Array2D<float>& gridlocs) {
 // 	float dist;
 
 // 	for (int32_t j = 0; j < sta_locs.nrow_; ++j) {
-// 		// dist = DistCartesian(src_loc, &sta_locs[j]);
-// 		dist = DistCartesian(src_loc, sta_locs.row(j));
+// 		// dist = process::DistCartesian(src_loc, &sta_locs[j]);
+// 		dist = process::DistCartesian(src_loc, sta_locs.row(j));
 // 		tts[j] = dist / velocity;
 // 	}
 // }
