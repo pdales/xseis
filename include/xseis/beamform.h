@@ -13,7 +13,48 @@ Beamforming functions.
 namespace beamform {
 
 
-Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint16_t nthreads)
+Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable)
+{
+	// Each thread given own output buffer to prevent cache invalidations
+
+	const size_t hlen = data_cc.ncol_ / 2;
+	const size_t ncc = data_cc.nrow_;
+	const size_t ngrid = ttable.ncol_;
+
+	const uint nthreads = omp_get_num_threads();
+	auto buf_multi = Array2D<float>(nthreads, ngrid);
+
+	uint16_t *tts_sta1, *tts_sta2;
+	float *cc_ptr = nullptr;
+
+	#pragma omp parallel private(tts_sta1, tts_sta2, cc_ptr) num_threads(nthreads)
+	{
+		float *out_ptr = buf_multi.row(omp_get_thread_num());
+		std::fill(out_ptr, out_ptr + ngrid, 0);
+
+		#pragma omp for
+		for (size_t i = 0; i < ncc; ++i)
+		{			
+			tts_sta1 = ttable.row(ckeys(i, 0));	
+			tts_sta2 = ttable.row(ckeys(i, 1));
+			cc_ptr = data_cc.row(i);
+
+			// Migrate single ccf on to grid based on tt difference
+			#pragma omp simd \
+			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+			for (size_t j = 0; j < ngrid; ++j) {
+				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
+
+			}
+		}
+	}
+	// combine thread buffers into final output
+	auto buf = buf_multi.sum_rows();
+	return buf;
+}
+
+
+Array2D<float> InterLocOld(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint16_t nthreads)
 {
 	// Each thread given own output buffer to prevent cache invalidations
 
@@ -62,10 +103,9 @@ Array2D<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array
 			}
 		}
 	}	
+
 	return output;
 }
-
-
 
 
 Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, size_t blocksize=1024 * 5, float scale_pwr=100)
@@ -133,8 +173,7 @@ Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, 
 }
 
 
-
-Vector<float> InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, size_t blocksize=1024 * 5, float scale_pwr=100)
+Vector<float> InterLocBlocksPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, size_t blocksize=1024 * 5, float scale_pwr=100)
 {
 	// Divide grid into chunks to prevent cache invalidations during writing (see Ben Baker migrate)
 	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
@@ -195,6 +234,63 @@ Vector<float> InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, s
 	// printf("completed\n");	
 	return output;
 }
+
+
+
+Vector<float> InterLocPatchNew(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, float scale_pwr=100)
+{
+	// Each thread given own output buffer to prevent cache invalidations
+	const size_t cclen = data_cc.ncol_;
+	const size_t ngrid = ttable.ncol_;
+	uint16_t *tts_sta1, *tts_sta2;
+	float *cc_ptr = nullptr;
+
+	auto output = Vector<float>(ngrid);
+	output.fill(0);
+
+	#pragma omp parallel private(tts_sta1, tts_sta2, cc_ptr)
+	{		
+		auto tmp = Vector<float>(ngrid);
+		tmp.fill(0);
+		float *out_ptr = tmp.begin();
+
+		#pragma omp for
+		for(size_t i = 0; i < ix_patch.size(); ++i) {
+			auto ix = ix_patch[i];
+			
+			tts_sta1 = ttable.row(ckeys(ix, 0));
+			tts_sta2 = ttable.row(ckeys(ix, 1));
+			cc_ptr = data_cc.row(ix);
+
+			// Migrate single ccf on to grid based on tt difference
+			#pragma omp simd \
+			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+			for (size_t j = 0; j < ngrid; ++j)
+			{			
+				if (tts_sta2[j] >= tts_sta1[j])
+				{
+					out_ptr[j] += cc_ptr[tts_sta2[j] - tts_sta1[j]];					
+				}
+				else
+				{
+					out_ptr[j] += cc_ptr[cclen - tts_sta1[j] + tts_sta2[j]];
+				}
+			}
+		}
+
+		for(size_t i = 0; i < ngrid; ++i) {
+			output[i] += tmp[i];
+		}
+	}
+
+	float norm = scale_pwr / static_cast<float>(ix_patch.size());	
+	for(size_t i = 0; i < output.size_; ++i) {
+		output[i] *= norm;
+	}
+
+	return output;
+}
+
 
 // Delay and summing raw waveforms for all gridlocs for all possible starttimes
 void NaiveSearch(Array2D<float>& data, Array2D<uint16_t>& ttable, size_t tmin, size_t tmax, Vector<float>& wpower, Vector<size_t>& wlocs)

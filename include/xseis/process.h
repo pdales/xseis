@@ -59,6 +59,39 @@ uint mod_floor(int a, int n) {
 }
 
 
+std::vector<fftwf_complex> BuildPhaseShiftVec(size_t const nfreq, long const nshift) {
+	
+	// auto v = Vector<fftwf_complex>(nfreq);
+	std::vector<fftwf_complex> v(nfreq);
+	float const fstep = 0.5 / (nfreq - 1);
+	float const factor = -nshift * 2 * M_PI * fstep;
+
+	for(size_t i = 0; i < nfreq; ++i) {
+		v[i][0] = std::cos(i * factor);
+		v[i][1] = std::sin(i * factor);			
+	}
+
+	return v;
+}
+
+
+// Mutiply sig1 by sig2 (x + yi)(u + vi) = (xu-yv) + (xv+yu)i
+// x + yi = s1[0] + s1[1]i
+// u + vi = s2[0] + s2[1]i
+#pragma omp declare simd aligned(sig1, sig2:MEM_ALIGNMENT)
+void Convolve(fftwf_complex* sig1, fftwf_complex* sig2, uint32_t const nfreq)
+{
+	float tmp;
+	#pragma omp simd aligned(sig1, sig2:MEM_ALIGNMENT)
+	for (uint32_t i = 0; i < nfreq; ++i){
+		tmp = sig1[i][0] * sig2[i][0] - sig1[i][1] * sig2[i][1];
+		sig1[i][1] = sig1[i][0] * sig2[i][1] + sig1[i][1] * sig2[i][0];
+		sig1[i][0] = tmp;
+	}
+}
+
+
+
 // Cross-correlate complex signals, cc(f) = s1(f) x s2*(f)
 #pragma omp declare simd aligned(sig1, sig2, out:MEM_ALIGNMENT)
 void XCorr(fftwf_complex* sig1, fftwf_complex* sig2, fftwf_complex* out, uint32_t nfreq)

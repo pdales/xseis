@@ -16,9 +16,9 @@ import math
 # import matplotlib.cm as cm
 
 
-def shift_locs(locs, unshift=False, vals=[650000, 4766000, 0]):
+def shift_locs(locs, unshift=False, vals=np.array([1.79236297e+05, 7.09943400e+06, 2.49199997e+02])):
 	vals = np.array(vals)
-	
+	locs[:, 2] *= -1
 	if unshift is True:
 		return locs + vals
 	else:
@@ -128,3 +128,9 @@ def xyz_max(grid, lims, spacing):
 	pt = np.array(np.unravel_index(iwin, grid.shape))[::-1]
 	pt = pt * spacing + lims[:, 0]
 	return pt
+
+
+def remap(x, out_min, out_max):
+	in_min = np.min(x)
+	in_max = np.max(x)
+	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
