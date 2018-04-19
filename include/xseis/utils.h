@@ -110,9 +110,10 @@ void FillRandInt(Vector<T>& d, T min, T max)
 }
 
 template<typename T>
-void FillRandFloat(T& d, float min, float max)
+void FillRandFloat(T& d, float min, float max, uint rseed=1)
 {
-	std::mt19937::result_type seed = time(0);
+	// std::mt19937::result_type seed = time(0);
+	std::mt19937::result_type seed = rseed;
 	auto rand = std::bind(std::uniform_real_distribution<float>(min, max), std::mt19937(seed));
 	for(unsigned i = 0; i < d.size_; ++i) {
 		d[i] = rand();

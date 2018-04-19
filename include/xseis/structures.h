@@ -241,26 +241,22 @@ public:
 
 	Vector<T> sum_rows() {
 
-		Vector<T> out = Vector<T>(ncol_);
-		out.fill(0);
+		Vector<T> vec = Vector<T>(ncol_);
+		std::copy(data_, data_ + ncol_, vec.data_);
+
 		T *out_ptr = nullptr;
 
-		// sum each row			
-		for (size_t i = 0; i < nrow_; ++i)
+		// sum each row after first			
+		for (size_t i = 1; i < nrow_; ++i)
 		{
 			out_ptr = data_ + i * ncol_;
 
 			for (size_t j = 0; j < ncol_; ++j) {
-				out[j] += out_ptr[j];
+				vec[j] += out_ptr[j];
 			}				
 		}
 
-		// // divide by nrow to get mean
-		// for (size_t j = 0; j < ncol_; ++j) {
-		// 		out[j] /= nrow_;
-		// 	}
-
-		return out;	
+		return vec;	
 	}
 
 	void arange(T start, T stop, T step){
@@ -404,7 +400,8 @@ struct Clock {
 	std::vector<stamp> stamps;
 	std::chrono::time_point<clock> t0, tnow;
 
-	Clock(){}
+	Clock(){start();}
+	
 	void start(){
 		t0 = clock::now();
 	}

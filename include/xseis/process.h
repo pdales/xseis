@@ -104,14 +104,15 @@ void XCorr(fftwf_complex* sig1, fftwf_complex* sig2, fftwf_complex* out, uint32_
 }
 
 // Cross-correlate signal pairs of fdata and output to fdata_cc
-void XCorrPairs(Array2D<fftwf_complex>& fdata, Array2D<uint16_t>& pairs, Array2D<fftwf_complex>& fdata_cc)
+void XCorrPairs(Array2D<fftwf_complex>& fdata, Array2D<uint16_t>& ckeys, Array2D<fftwf_complex>& fdata_cc)
 {	
 	uint32_t nfreq = fdata.ncol_;
 
 	#pragma omp for
-	for (size_t i = 0; i < pairs.nrow_; ++i)
+	for (size_t i = 0; i < ckeys.nrow_; ++i)
 	{
-		XCorr(fdata.row(pairs(i, 0)), fdata.row(pairs(i, 1)),
+		// std::cout << "npair: " << i << '\n';
+		XCorr(fdata.row(ckeys(i, 0)), fdata.row(ckeys(i, 1)),
 			 fdata_cc.row(i), nfreq);
 	}
 

@@ -228,5 +228,38 @@ class FftHandler {
 
 		}
 
+		Array2D<fftwf_complex> plan_fwd_LOOP(Array2D<float>& data, uint wlen)
+		{
+			// plan forward transform and return complex buffer
+
+			nsig_ = data.nrow_;
+			npts_ = data.ncol_;
+			wlen_ = wlen;
+			nfreq_ = wlen_ / 2 + 1;
+
+			inf32_ = data.data_;
+
+			outf32_ = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * nsig_ * nfreq_);
+			auto arr_outf32 = Array2D<fftwf_complex>(outf32_, nsig_, nfreq_);
+			
+			nf[0]    = wlen_;        // 1D real transform length
+			howmanyf = nsig_;       // Number of transforms
+			idistf = npts_;        // Distance between start of k'th input
+			odistf = nfreq_;      // Distance between start of k'th output 
+			
+			// plan_fwd_ = fftwf_plan_many_dft_r2c(rank, nf, howmanyf,
+			// 										inf32_, inembed,
+			// 										istride, idistf,
+			// 										outf32_, onembed,
+			// 										ostride, odistf,
+			// 										patience_);
+
+			plan_fwd_ = fftwf_plan_dft_r2c_1d(wlen_,
+                               inf32_, outf32_,
+                               patience_);
+			return arr_outf32;
+
+		}
+
 };
 #endif

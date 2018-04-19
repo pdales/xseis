@@ -21,7 +21,8 @@ Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2
 	const size_t ncc = data_cc.nrow_;
 	const size_t ngrid = ttable.ncol_;
 
-	const uint nthreads = omp_get_num_threads();
+	const uint nthreads = omp_get_max_threads();
+	std::cout << "nthreads: " << nthreads << '\n';
 	auto buf_multi = Array2D<float>(nthreads, ngrid);
 
 	uint16_t *tts_sta1, *tts_sta2;
@@ -31,6 +32,7 @@ Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2
 	{
 		float *out_ptr = buf_multi.row(omp_get_thread_num());
 		std::fill(out_ptr, out_ptr + ngrid, 0);
+		// std::cout << "hi from thread: " << omp_get_thread_num() << '\n';
 
 		#pragma omp for
 		for (size_t i = 0; i < ncc; ++i)
@@ -50,61 +52,48 @@ Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2
 	}
 	// combine thread buffers into final output
 	auto buf = buf_multi.sum_rows();
+
 	return buf;
 }
 
 
-Array2D<float> InterLocOld(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint16_t nthreads)
+Vector<float> InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, float scale_pwr=100)
 {
-	// Each thread given own output buffer to prevent cache invalidations
-
-	const size_t cclen = data_cc.ncol_;
-	const size_t ncc = data_cc.nrow_;
+	const size_t hlen = data_cc.ncol_ / 2;	
 	const size_t ngrid = ttable.ncol_;
 
-	uint16_t *tts_sta1, *tts_sta2;
+
+	auto buf = Vector<float>(ngrid);
+	buf.fill(0);
+
+	float *out_ptr = buf.begin();
 	float *cc_ptr = nullptr;
+	uint16_t *tts_sta1, *tts_sta2;
+	size_t ix;
 
-	auto output = Array2D<float>(nthreads, ngrid);
-	size_t niter = 0;
-	#pragma omp parallel private(tts_sta1, tts_sta2, cc_ptr) num_threads(nthreads)
-	{
-		float *out_ptr = output.row(omp_get_thread_num());
-		std::fill(out_ptr, out_ptr + ngrid, 0);
-		// play around with omp loop scheduling here
-		#pragma omp for
-		for (size_t i = 0; i < ncc; ++i)
-		{
-			// if (i % 10000 == 0) {
-			// 	printf("Prog: %.2f \r", ((float) i / ncc * 100));
-			// 	std::cout.flush();
-			// }
+	for(size_t i = 0; i < ix_patch.size(); ++i) {
+		ix = ix_patch[i];
+		
+		tts_sta1 = ttable.row(ckeys(ix, 0));
+		tts_sta2 = ttable.row(ckeys(ix, 1));
+		cc_ptr = data_cc.row(ix);
 
-			tts_sta1 = ttable.row(ckeys(i, 0));	
-			tts_sta2 = ttable.row(ckeys(i, 1));
-			cc_ptr = data_cc.row(i);
+		// Migrate single ccf on to grid based on tt difference
+		#pragma omp simd \
+		aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+		for (size_t j = 0; j < ngrid; ++j) {
 
-			// Migrate single ccf on to grid based on tt difference
-			#pragma omp simd \
-			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
-			for (size_t j = 0; j < ngrid; ++j)
-			{
-				// Get appropriate ix of unrolled ccfs (same as mod_floor)
-				// by wrapping negative traveltime differences
-				// if-else much faster than more elegant mod function
-				if (tts_sta2[j] >= tts_sta1[j])
-				{
-					out_ptr[j] += cc_ptr[tts_sta2[j] - tts_sta1[j]];					
-				}
-				else
-				{
-					out_ptr[j] += cc_ptr[cclen - tts_sta1[j] + tts_sta2[j]];
-				}
-			}
+			out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
 		}
-	}	
+	}
 
-	return output;
+
+	float norm = scale_pwr / static_cast<float>(ix_patch.size());	
+	for(size_t i = 0; i < buf.size_; ++i) {
+		buf[i] *= norm;
+	}
+
+	return buf;
 }
 
 
@@ -237,59 +226,6 @@ Vector<float> InterLocBlocksPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ck
 
 
 
-Vector<float> InterLocPatchNew(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, float scale_pwr=100)
-{
-	// Each thread given own output buffer to prevent cache invalidations
-	const size_t cclen = data_cc.ncol_;
-	const size_t ngrid = ttable.ncol_;
-	uint16_t *tts_sta1, *tts_sta2;
-	float *cc_ptr = nullptr;
-
-	auto output = Vector<float>(ngrid);
-	output.fill(0);
-
-	#pragma omp parallel private(tts_sta1, tts_sta2, cc_ptr)
-	{		
-		auto tmp = Vector<float>(ngrid);
-		tmp.fill(0);
-		float *out_ptr = tmp.begin();
-
-		#pragma omp for
-		for(size_t i = 0; i < ix_patch.size(); ++i) {
-			auto ix = ix_patch[i];
-			
-			tts_sta1 = ttable.row(ckeys(ix, 0));
-			tts_sta2 = ttable.row(ckeys(ix, 1));
-			cc_ptr = data_cc.row(ix);
-
-			// Migrate single ccf on to grid based on tt difference
-			#pragma omp simd \
-			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
-			for (size_t j = 0; j < ngrid; ++j)
-			{			
-				if (tts_sta2[j] >= tts_sta1[j])
-				{
-					out_ptr[j] += cc_ptr[tts_sta2[j] - tts_sta1[j]];					
-				}
-				else
-				{
-					out_ptr[j] += cc_ptr[cclen - tts_sta1[j] + tts_sta2[j]];
-				}
-			}
-		}
-
-		for(size_t i = 0; i < ngrid; ++i) {
-			output[i] += tmp[i];
-		}
-	}
-
-	float norm = scale_pwr / static_cast<float>(ix_patch.size());	
-	for(size_t i = 0; i < output.size_; ++i) {
-		output[i] *= norm;
-	}
-
-	return output;
-}
 
 
 // Delay and summing raw waveforms for all gridlocs for all possible starttimes
@@ -819,6 +755,60 @@ std::vector<float> MaxAndLoc(Vector<float>& power, Array2D<float>& gridlocs) {
 	return stats;
 }
 
+
+
+// Array2D<float> InterLocOld(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint16_t nthreads)
+// {
+// 	// Each thread given own output buffer to prevent cache invalidations
+
+// 	const size_t cclen = data_cc.ncol_;
+// 	const size_t ncc = data_cc.nrow_;
+// 	const size_t ngrid = ttable.ncol_;
+
+// 	uint16_t *tts_sta1, *tts_sta2;
+// 	float *cc_ptr = nullptr;
+
+// 	auto output = Array2D<float>(nthreads, ngrid);
+// 	size_t niter = 0;
+// 	#pragma omp parallel private(tts_sta1, tts_sta2, cc_ptr) num_threads(nthreads)
+// 	{
+// 		float *out_ptr = output.row(omp_get_thread_num());
+// 		std::fill(out_ptr, out_ptr + ngrid, 0);
+// 		// play around with omp loop scheduling here
+// 		#pragma omp for
+// 		for (size_t i = 0; i < ncc; ++i)
+// 		{
+// 			// if (i % 10000 == 0) {
+// 			// 	printf("Prog: %.2f \r", ((float) i / ncc * 100));
+// 			// 	std::cout.flush();
+// 			// }
+
+// 			tts_sta1 = ttable.row(ckeys(i, 0));	
+// 			tts_sta2 = ttable.row(ckeys(i, 1));
+// 			cc_ptr = data_cc.row(i);
+
+// 			// Migrate single ccf on to grid based on tt difference
+// 			#pragma omp simd \
+// 			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+// 			for (size_t j = 0; j < ngrid; ++j)
+// 			{
+// 				// Get appropriate ix of unrolled ccfs (same as mod_floor)
+// 				// by wrapping negative traveltime differences
+// 				// if-else much faster than more elegant mod function
+// 				if (tts_sta2[j] >= tts_sta1[j])
+// 				{
+// 					out_ptr[j] += cc_ptr[tts_sta2[j] - tts_sta1[j]];					
+// 				}
+// 				else
+// 				{
+// 					out_ptr[j] += cc_ptr[cclen - tts_sta1[j] + tts_sta2[j]];
+// 				}
+// 			}
+// 		}
+// 	}	
+
+// 	return output;
+// }
 
 
 // std::vector<uint16_t> GetStationKeysNear(Vector<float>& loc, Array2D<float>& stalocs, float max_dist) {
