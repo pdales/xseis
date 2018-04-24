@@ -40,3 +40,15 @@ func = lambda k: fftpack.rfft(data_bc.value[k])
 # by not returning anything 
 %timeit rdd.foreach(func)
 # 84.1 ms ± 3.51 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
+
+
+keys = np.arange(data.shape[0])
+rdd = sc.parallelize(keys)
+
+# Naive attempt: not broadcasting
+# data_bc = sc.broadcast(data)
+rdd = sc.parallelize(data)
+func = lambda sig: fftpack.rfft(sig)
+%timeit output = rdd.map(func).collect()
+# 147 ms ± 8.65 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
+

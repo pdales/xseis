@@ -82,7 +82,6 @@ Vector<float> InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, s
 		#pragma omp simd \
 		aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
 		for (size_t j = 0; j < ngrid; ++j) {
-
 			out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
 		}
 	}
@@ -741,6 +740,76 @@ Vector<float> DistDiffFromCkeys(Array2D<uint16_t>& ckeys, Array2D<float>& staloc
 	}
 	return dist_diff;
 }
+
+// Build groups of ckeys for stas within radius of mid_stas
+std::vector<std::vector<uint16_t>> CkeyPatchesFromStations(std::vector<uint>& mid_stas, Array2D<float>& stalocs, float radius, float cdist_min, float cdist_max) 
+{
+
+	// std::vector<uint16_t> ckeys_vec;
+	std::vector<std::vector<uint16_t>> patches;
+
+	uint csum = 0;
+	for(auto&& ix : mid_stas) {
+		auto loc_patch = stalocs.row_view(ix);
+		auto pkeys = GetStationKeysNear(loc_patch, stalocs, radius);
+		patches.push_back(AllPairsFilt(pkeys, stalocs, cdist_min, cdist_max));
+	}
+	return patches;
+}
+
+// Builds ckey index from groups of ckeys
+std::vector<std::vector<uint>> IndexesFromCkeyPatches(std::vector<std::vector<uint16_t>>& patches) 
+{
+	std::vector<std::vector<uint>> ipatches;
+
+	size_t csum = 0;
+	for(auto&& patch : patches) {
+		size_t ncc = patch.size() / 2;
+		std::vector<uint> ipatch(ncc);
+
+		for(size_t i = 0; i < ncc; ++i) {
+			ipatch.push_back(i + csum);
+		}
+		ipatches.push_back(ipatch);
+		csum += ncc;
+	}
+	return ipatches;
+}
+
+// Builds ckey index from groups of ckeys
+Array2D<uint16_t> CkeysFromPatches(std::vector<std::vector<uint16_t>>& patches) 
+{
+	// std::vector<std::vector<size_t>> ipatches;
+	size_t ncc = 0;
+	for(auto&& patch : patches) {ncc += patch.size() / 2;}
+
+	auto ckeys = Array2D<uint16_t>(ncc, 2);
+
+	size_t csum = 0;
+	auto ptr = ckeys.data_;
+
+	for(auto&& vec : patches) {
+		std::copy(vec.begin(), vec.end(), ptr);
+		ptr += vec.size();		
+	}
+	return ckeys;
+}
+
+
+
+
+// ckeys_vec.insert(ckeys_vec.end(), ck_patch.begin(), ck_patch.end());
+// uint patch_len = ck_patch.size() / 2;
+
+// std::vector<uint> ipatch(patch_len);
+// for(size_t i = 0; i < patch_len; ++i) {
+// 	ipatch.push_back(i + csum);
+// }
+// ipatches.push_back(ipatch);
+// csum += patch_len;
+// std::cout << "nkeys: " << patch_len << '\n';
+
+
 
 std::vector<float> MaxAndLoc(Vector<float>& power, Array2D<float>& gridlocs) {
 

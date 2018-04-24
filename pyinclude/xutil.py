@@ -25,6 +25,14 @@ def shift_locs(locs, unshift=False, vals=np.array([1.79236297e+05, 7.09943400e+0
 		return locs - vals
 
 
+def shift_locs_ot(locs, unshift=False, vals=np.array([650000., 4766000., 0])):
+	vals = np.array(vals)
+	if unshift is True:
+		return locs + vals
+	else:
+		return locs - vals
+
+
 def normVec(v):
 	return v / norm(v)
 

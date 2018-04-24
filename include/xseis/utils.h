@@ -40,6 +40,17 @@ namespace utils {
 
 // }
 
+std::vector<size_t> OverlappingWindows(size_t npts, size_t wlen, float overlap) 
+{
+	std::vector<size_t> wix;
+	size_t ix = 0;
+	while(ix < (npts - wlen)) {
+		wix.push_back(ix);
+		ix += (1 - overlap) * wlen;
+	}
+	return wix;				
+}
+
 
 
 
