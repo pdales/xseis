@@ -102,7 +102,8 @@ Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, 
 	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
 	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
 
-	const size_t cclen = data_cc.ncol_;
+	// const size_t cclen = data_cc.ncol_;
+	const size_t hlen = data_cc.ncol_ / 2;	
 	const size_t ncc = data_cc.nrow_;
 	const size_t ngrid = ttable.ncol_;
 	size_t blocklen;
@@ -134,18 +135,8 @@ Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, 
 			// Migrate single ccf on to grid based on tt difference
 			#pragma omp simd \
 			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
-			for (size_t j = 0; j < blocklen; ++j)
-			{
-				// Get appropriate ix of unrolled ccfs (same as mod_floor)
-				// by wrapping negative traveltime differences
-				if (tts_sta2[j] >= tts_sta1[j])
-				{
-					out_ptr[j] += cc_ptr[tts_sta2[j] - tts_sta1[j]];					
-				}
-				else
-				{
-					out_ptr[j] += cc_ptr[cclen - tts_sta1[j] + tts_sta2[j]];
-				}
+			for (size_t j = 0; j < blocklen; ++j) {
+				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
 			}
 		}
 
@@ -473,14 +464,12 @@ std::vector<uint16_t> UniquePairsFlat(Vector<uint16_t>& keys)
 	return ckeys;
 }
 
-std::vector<uint16_t> AllPairsFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist, float min_ang=-0.14, float max_ang=-0.10)
+std::vector<uint16_t> AllPairsFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, float min_dist, float max_dist, bool ang_filt=true)
 {
-	// size_t npair = 0;
-	// size_t npair_max = NChoose2(keys.size_);
-	// printf("max pairs %lu\n", npair_max);
-	// auto ckeys = Array2D<uint16_t>(npair_max, 2);
-	// size_t nfill = 0;
-	// std::vector<uint16_t> ckeys(NChoose2(keys.size_) / 2);
+
+	float min_ang = -0.14;
+	float max_ang = -0.10;
+	
 	std::vector<uint16_t> ckeys;
 
 	float* loc1 = nullptr;
@@ -500,15 +489,16 @@ std::vector<uint16_t> AllPairsFilt(Vector<uint16_t>& keys, Array2D<float>& stalo
 
 			if (dist > min_dist && dist < max_dist)
 			{	
-				angle = process::AngleBetweenPoints(loc1, loc2);
 
-				if(min_ang < angle && angle < max_ang) {
-					continue;
+				if (ang_filt == true)
+				{
+					angle = process::AngleBetweenPoints(loc1, loc2);
+					if(min_ang < angle && angle < max_ang) {
+						continue;
+					}
 				}
-				else{
-					ckeys.push_back(keys[i]);
-					ckeys.push_back(keys[j]);					
-				}
+				ckeys.push_back(keys[i]);
+				ckeys.push_back(keys[j]);					
 			}			
 		}
 	}
@@ -742,17 +732,16 @@ Vector<float> DistDiffFromCkeys(Array2D<uint16_t>& ckeys, Array2D<float>& staloc
 }
 
 // Build groups of ckeys for stas within radius of mid_stas
-std::vector<std::vector<uint16_t>> CkeyPatchesFromStations(std::vector<uint>& mid_stas, Array2D<float>& stalocs, float radius, float cdist_min, float cdist_max) 
+std::vector<std::vector<uint16_t>> CkeyPatchesFromStations(std::vector<uint>& mid_stas, Array2D<float>& stalocs, float radius, float cdist_min, float cdist_max, bool ang_filt=true) 
 {
 
 	// std::vector<uint16_t> ckeys_vec;
 	std::vector<std::vector<uint16_t>> patches;
 
-	uint csum = 0;
 	for(auto&& ix : mid_stas) {
 		auto loc_patch = stalocs.row_view(ix);
 		auto pkeys = GetStationKeysNear(loc_patch, stalocs, radius);
-		patches.push_back(AllPairsFilt(pkeys, stalocs, cdist_min, cdist_max));
+		patches.push_back(AllPairsFilt(pkeys, stalocs, cdist_min, cdist_max, ang_filt));
 	}
 	return patches;
 }
@@ -765,7 +754,8 @@ std::vector<std::vector<uint>> IndexesFromCkeyPatches(std::vector<std::vector<ui
 	size_t csum = 0;
 	for(auto&& patch : patches) {
 		size_t ncc = patch.size() / 2;
-		std::vector<uint> ipatch(ncc);
+		std::vector<uint> ipatch;
+		ipatch.reserve(ncc);
 
 		for(size_t i = 0; i < ncc; ++i) {
 			ipatch.push_back(i + csum);

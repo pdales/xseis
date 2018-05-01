@@ -52,6 +52,24 @@ std::vector<size_t> OverlappingWindows(size_t npts, size_t wlen, float overlap)
 }
 
 
+template<typename T>
+std::vector<T> linspace(T start, T stop, size_t size){
+
+		std::vector<T> vec;
+		vec.reserve(size);
+
+		float step = (stop - start) / static_cast<float>(size);
+		std::cout << "step: " << step << '\n';
+
+		for (size_t i = 0; i < size; ++i) {
+			// vec[i] = start + step * static_cast<float>(i);
+			vec.push_back(start + step * static_cast<float>(i));
+		}
+
+		return vec;
+	}
+
+
 
 
 // Set first N elements of array with randomly chosen elements

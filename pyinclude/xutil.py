@@ -16,6 +16,30 @@ import math
 # import matplotlib.cm as cm
 
 
+def SearchClusters(data, dmin):
+
+	inds = np.arange(data.shape[1])
+
+	slocs = []
+	vals = []
+	for j, ix in enumerate(inds):
+		print(j)
+		lmax = data[:-1, ix, 1:]
+		tmp = []
+		for k, centroid in enumerate(lmax):
+			diff = np.linalg.norm(lmax - centroid, axis=-1)
+			tmp.append(np.where(diff < dmin)[0].size)
+
+		imax = np.argmax(tmp)
+		vals.append(tmp[imax])
+		slocs.append(lmax[imax])
+
+	vals = np.array(vals)
+	slocs = np.array(slocs)
+
+	return vals, slocs
+
+
 def shift_locs(locs, unshift=False, vals=np.array([1.79236297e+05, 7.09943400e+06, 2.49199997e+02])):
 	vals = np.array(vals)
 	locs[:, 2] *= -1
