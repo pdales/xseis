@@ -69,12 +69,19 @@ std::vector<T> linspace(T start, T stop, size_t size){
 		return vec;
 	}
 
-
+	
+template<typename T>
+std::vector<T> arange(T start, T stop, T step = 1) {
+	std::vector<T> values;
+	for (T value = start; value < stop; value += step)
+		values.push_back(value);
+	return values;
+}
 
 
 // Set first N elements of array with randomly chosen elements
 template<class BidiIter >
-void random_unique(BidiIter begin, BidiIter end, size_t num_random) {
+void RandomShuffle(BidiIter begin, BidiIter end, size_t num_random) {
 	size_t left = std::distance(begin, end);
 	while (num_random--) {
 		BidiIter r = begin;
@@ -133,7 +140,7 @@ void FillRandInt(Vector<T>& d, T min, T max)
 {
 	std::mt19937::result_type seed = time(0);
 	auto rand = std::bind(std::uniform_int_distribution<T>(min, max), std::mt19937(seed));
-	for(unsigned i = 0; i < d.size_; ++i) {
+	for(size_t i = 0; i < d.size_; ++i) {
 		d[i] = rand();
 	}
 }
@@ -144,7 +151,7 @@ void FillRandFloat(T& d, float min, float max, uint rseed=1)
 	// std::mt19937::result_type seed = time(0);
 	std::mt19937::result_type seed = rseed;
 	auto rand = std::bind(std::uniform_real_distribution<float>(min, max), std::mt19937(seed));
-	for(unsigned i = 0; i < d.size_; ++i) {
+	for(size_t i = 0; i < d.size_; ++i) {
 		d[i] = rand();
 	}
 }
@@ -405,6 +412,10 @@ std::string ZeroPadInt(unsigned val, unsigned npad=5){
 	std::stringstream ss;
 	ss << std::setw(npad) << std::setfill('0') << val;
 	return ss.str();
+}
+
+void PrintMaxAndLoc(std::vector<float> v){
+	printf("%.6f (max) @ [%.0f, %.0f, %.0f] \n", v[0], v[1], v[2], v[3]);
 }
 
 }

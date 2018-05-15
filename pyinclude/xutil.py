@@ -14,6 +14,11 @@ import math
 # from scipy.fftpack import fft, ifft, rfft, fftfreq
 # import matplotlib.colors
 # import matplotlib.cm as cm
+from scipy.fftpack import fft, ifft, rfft, fftfreq
+
+
+def mlab_coords(locs, lims, spacing):
+	return (locs - lims[:, 0]).T / spacing
 
 
 def SearchClusters(data, dmin):
@@ -166,3 +171,70 @@ def remap(x, out_min, out_max):
 	in_min = np.min(x)
 	in_max = np.max(x)
 	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
+
+def bandpass(data, band, sr, corners=4, zerophase=True):
+	from scipy.signal import sosfilt, zpk2sos, iirfilter
+
+	freqmin, freqmax = band
+	fe = 0.5 * sr
+	low = freqmin / fe
+	high = freqmax / fe
+
+	z, p, k = iirfilter(corners, [low, high], btype='band',
+						ftype='butter', output='zpk')
+	sos = zpk2sos(z, p, k)
+	if zerophase:
+		firstpass = sosfilt(sos, data)
+		if len(data.shape) == 1:
+			return sosfilt(sos, firstpass[::-1])[::-1]
+		else:
+			return np.fliplr(sosfilt(sos, np.fliplr(firstpass)))
+	else:
+		return sosfilt(sos, data)
+
+
+def norm2d(d):
+	return d / np.max(np.abs(d), axis=1)[:, np.newaxis]
+
+
+def cross_corr(sig1, sig2, norm=True, pad=False, phase_only=False, phat=False):
+	"""Cross-correlate two signals."""
+	pad_len = len(sig1)
+	if pad is True:
+		pad_len *= 2
+		# pad_len = signal.next_pow_2(pad_len)
+
+	sig1f = fft(sig1, pad_len)
+	sig2f = fft(sig2, pad_len)
+
+	if phase_only is True:
+		ccf = np.exp(- 1j * np.angle(sig1f)) * np.exp(1j * np.angle(sig2f))
+	else:
+		ccf = np.conj(sig1f) * sig2f
+
+	if phat:
+		ccf = ccf / np.abs(ccf)
+
+	cc = np.real(ifft(ccf))
+
+	if norm:
+		cc /= np.sqrt(energy(sig1) * energy(sig2))
+
+	return np.roll(cc, len(cc) // 2)
+
+
+def energy(sig, axis=None):
+	return np.sum(sig ** 2, axis=axis)
+
+
+def build_slice_inds(start, stop, wlen, stepsize=None):
+
+	if stepsize is None:
+		stepsize = wlen
+
+	overlap = wlen - stepsize
+	imin = np.arange(start, stop - overlap - 1, stepsize)
+	imax = np.arange(start + wlen, stop + stepsize - 1, stepsize)
+
+	return np.dstack((imin, imax))[0]

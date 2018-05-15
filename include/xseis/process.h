@@ -316,6 +316,22 @@ void ExpMovingAverage(float *sig, size_t npts, uint wlen, bool both_ways=false)
 	}
 }
 
+void EMA_NoAbs(float *sig, size_t npts, uint wlen, bool both_ways=false)
+{
+	float alpha = 2 / (static_cast<float>(wlen) + 1);
+	float beta = 1 - alpha;
+
+	for (size_t i = 1; i < npts; ++i){
+		sig[i] = alpha * sig[i] + beta * sig[i - 1];
+	}
+
+	if(both_ways == true) {
+		for (long i = npts - 2; i >= 0; --i){
+			sig[i] = alpha * sig[i] + beta * sig[i + 1];
+		}
+	}
+}
+
 float median(float *sig, size_t npts)
 {
     size_t half = npts / 2;
@@ -454,8 +470,6 @@ float mean(T *data, size_t size) {
 	mean /= size;
 	return mean;	
 }
-
-
 
 
 // void norm_energy(float (*sig)[2], int npts)

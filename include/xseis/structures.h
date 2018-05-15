@@ -14,7 +14,6 @@ ndim array library.
 #include <vector>
 #include <algorithm>
 
-
 /// namespace structures {
 
 template <typename T>

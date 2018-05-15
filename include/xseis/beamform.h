@@ -13,7 +13,7 @@ Beamforming functions.
 namespace beamform {
 
 
-Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable)
+Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, float scale_pwr=100)
 {
 	// Each thread given own output buffer to prevent cache invalidations
 
@@ -52,6 +52,11 @@ Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2
 	}
 	// combine thread buffers into final output
 	auto buf = buf_multi.sum_rows();
+
+	float norm = scale_pwr / static_cast<float>(ncc);	
+	for(size_t i = 0; i < buf.size_; ++i) {
+		buf[i] *= norm;
+	}
 
 	return buf;
 }
@@ -151,6 +156,57 @@ Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, 
 	return output;
 }
 
+void InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, Vector<float>& output, size_t blocksize=1024 * 5, float scale_pwr=100)
+{
+	// Divide grid into chunks to prevent cache invalidations during writing (see Ben Baker migrate)
+	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
+	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
+
+	// const size_t cclen = data_cc.ncol_;
+	const size_t hlen = data_cc.ncol_ / 2;	
+	const size_t ncc = data_cc.nrow_;
+	const size_t ngrid = ttable.ncol_;
+	size_t blocklen;
+
+	uint16_t *tts_sta1, *tts_sta2;
+	float *cc_ptr = nullptr;
+	float *out_ptr = nullptr;
+
+	output.fill(0);
+	// printf("blocksize %lu, ngrid %lu \n", blocksize, ngrid);
+
+	#pragma omp parallel for private(tts_sta1, tts_sta2, cc_ptr, out_ptr, blocklen)
+	for(size_t iblock = 0; iblock < ngrid; iblock += blocksize) {
+
+		blocklen = std::min(ngrid - iblock, blocksize);
+
+		out_ptr = output.data_ + iblock;
+		// out_ptr = output.data_ + iblock * blocklen;
+		// std::fill(out_ptr, out_ptr + blocklen, 0);
+		
+		for (size_t i = 0; i < ncc; ++i)
+		{				
+			tts_sta1 = ttable.row(ckeys(i, 0)) + iblock;	
+			tts_sta2 = ttable.row(ckeys(i, 1)) + iblock;
+			cc_ptr = data_cc.row(i);
+
+			// Migrate single ccf on to grid based on tt difference
+			#pragma omp simd \
+			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+			for (size_t j = 0; j < blocklen; ++j) {
+				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
+			}
+		}
+
+	}	
+
+	float norm = scale_pwr / static_cast<float>(ncc);	
+	for(size_t i = 0; i < output.size_; ++i) {
+		output[i] *= norm;
+	}
+
+}
+
 
 Vector<float> InterLocBlocksPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, size_t blocksize=1024 * 5, float scale_pwr=100)
 {
@@ -158,7 +214,8 @@ Vector<float> InterLocBlocksPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ck
 	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
 	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
 
-	const size_t cclen = data_cc.ncol_;
+	// const size_t cclen = data_cc.ncol_;
+	const size_t hlen = data_cc.ncol_ / 2;	
 	const size_t ngrid = ttable.ncol_;
 	size_t blocklen;
 
@@ -189,28 +246,17 @@ Vector<float> InterLocBlocksPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ck
 			// Migrate single ccf on to grid based on tt difference
 			#pragma omp simd \
 			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
-			for (size_t j = 0; j < blocklen; ++j)
-			{
-				// Get appropriate ix of unrolled ccfs (same as mod_floor)
-				// by wrapping negative traveltime differences
-				if (tts_sta2[j] >= tts_sta1[j])
-				{
-					out_ptr[j] += cc_ptr[tts_sta2[j] - tts_sta1[j]];					
-				}
-				else
-				{
-					out_ptr[j] += cc_ptr[cclen - tts_sta1[j] + tts_sta2[j]];
-				}
+			for (size_t j = 0; j < blocklen; ++j) {
+				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
 			}
 		}
-
 	}
 
 	float norm = scale_pwr / static_cast<float>(ix_patch.size());	
 	for(size_t i = 0; i < output.size_; ++i) {
 		output[i] *= norm;
 	}
-	// printf("completed\n");	
+
 	return output;
 }
 
@@ -304,6 +350,28 @@ Array2D<uint16_t> BuildTTablePerturbVel(Array2D<float>& stalocs, Array2D<float>&
 	return ttable;
 }
 
+
+void FillTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, float vel, float sr, Array2D<uint16_t>& ttable)
+{
+
+	float vsr = sr / vel;
+	float dist;
+	float *sloc = nullptr;
+	uint16_t *tt_row = nullptr;
+
+	#pragma omp parallel for private(sloc, tt_row, dist)
+	for (size_t i = 0; i < ttable.nrow_; ++i)
+	{
+		sloc = stalocs.row(i);
+		tt_row = ttable.row(i);
+
+		for (size_t j = 0; j < ttable.ncol_; ++j) 
+		{
+			dist = process::DistCartesian(sloc, gridlocs.row(j));			
+			tt_row[j] = static_cast<uint16_t>(dist * vsr + 0.5);
+		}
+	}
+}
 
 // Uses constant velocity medium
 Array2D<uint16_t> BuildTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, float vel, float sr)

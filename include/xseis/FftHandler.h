@@ -242,10 +242,10 @@ class FftHandler {
 			outf32_ = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * nsig_ * nfreq_);
 			auto arr_outf32 = Array2D<fftwf_complex>(outf32_, nsig_, nfreq_);
 			
-			nf[0]    = wlen_;        // 1D real transform length
-			howmanyf = nsig_;       // Number of transforms
-			idistf = npts_;        // Distance between start of k'th input
-			odistf = nfreq_;      // Distance between start of k'th output 
+			// nf[0]    = wlen_;        // 1D real transform length
+			// howmanyf = nsig_;       // Number of transforms
+			// idistf = npts_;        // Distance between start of k'th input
+			// odistf = nfreq_;      // Distance between start of k'th output 
 			
 			// plan_fwd_ = fftwf_plan_many_dft_r2c(rank, nf, howmanyf,
 			// 										inf32_, inembed,

@@ -23,7 +23,7 @@ def v2color(vals):
 	return clrs
 
 
-def stations(locs, ckeys=None, vals=None, alpha=0.3, lstep=100, pkeys=None):
+def stations(locs, ckeys=None, vals=None, alpha=0.3, lstep=100, pkeys=None, plocs=None):
 	locs = locs[:, :2]
 	x, y = locs.T
 	plt.scatter(x, y, alpha=alpha, s=6, zorder=0)
@@ -45,7 +45,15 @@ def stations(locs, ckeys=None, vals=None, alpha=0.3, lstep=100, pkeys=None):
 
 	if pkeys is not None:
 		x, y = locs[pkeys].T
-		plt.scatter(x, y, s=100, color='red', zorder=2)
+		plt.scatter(x, y, s=60, color='red', zorder=2)
+		for i in range(x.size):
+			plt.text(x[i], y[i], i, color='green')
+
+	if plocs is not None:
+		x, y = plocs[:, :2].T
+		plt.scatter(x, y, s=60, color='red', marker='x', zorder=2)
+		for i in range(x.size):
+			plt.text(x[i], y[i], i, color='green')
 
 	plt.axis('equal')
 	plt.show()
@@ -68,9 +76,9 @@ def im_freq(d, sr, norm=False, xlims=None):
 	plt.show()
 
 
-def im(d, norm=True, savedir=None, tkey='im_raw', cmap='viridis', aspect='auto', extent=None, locs=None, labels=None):
+def im(d, norm=True, savedir=None, tkey='im_raw', cmap='viridis', aspect='auto', extent=None, locs=None, labels=None, title=None):
 
-	fig = plt.figure(figsize=(14, 9), facecolor='white')
+	fig = plt.figure(figsize=(10, 7), facecolor='white')
 	# if times is not None:
 	# 	extent = [times[0], times[-1], 0, d.shape[0]]
 
@@ -89,6 +97,8 @@ def im(d, norm=True, savedir=None, tkey='im_raw', cmap='viridis', aspect='auto',
 	if labels is not None:
 		plt.xlabel(labels[0])
 		plt.ylabel(labels[1])
+	if title is not None:
+		plt.title(title)
 	# manager = plt.get_current_fig_manager()
 	# manager.resize(*manager.window.maxsize())
 	plt.tight_layout()
@@ -148,6 +158,23 @@ def sigs(d, spacing=10, labels=None, vlines=None):
 	if labels is not None:
 		for i, lbl in enumerate(labels):
 			plt.text(0, shifts[i] + 2 * std, lbl, fontsize=15)
+
+	plt.show()
+
+
+def sigsNorm(d, spacing=1, labels=None, vlines=None):
+
+	if vlines is not None:
+		for v in vlines:
+			plt.axvline(v, linestyle='--', color='red')
+
+	shifts = np.arange(0, d.shape[0], 1) * spacing
+	for i, sig in enumerate(d):
+		plt.plot(sig / np.max(np.abs(sig)) + shifts[i])
+
+	if labels is not None:
+		for i, lbl in enumerate(labels):
+			plt.text(0, shifts[i], lbl, fontsize=15)
 
 	plt.show()
 
