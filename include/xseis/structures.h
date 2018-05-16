@@ -258,6 +258,25 @@ public:
 		return vec;	
 	}
 
+	Array2D<T> transpose() {
+
+		auto arr = Array2D<T>(ncol_, nrow_);
+
+
+		T *out_ptr = nullptr;
+
+		for (size_t i = 0; i < nrow_; ++i)
+		{
+			out_ptr = data_ + i * ncol_;
+
+			for (size_t j = 0; j < ncol_; ++j) {
+				arr(j, i) = out_ptr[j];
+			}				
+		}
+
+		return arr;	
+	}
+
 	void arange(T start, T stop, T step){
 		size_ = (stop - start) / step;
 
@@ -305,8 +324,7 @@ public:
 	// 	std::copy(data_, data_ + size_, acopy.data_);
 	// 	return acopy;
 	// }
-
-
+	
 	void fill(T value){std::fill(data_, data_ + size_, value);}	
 };
 

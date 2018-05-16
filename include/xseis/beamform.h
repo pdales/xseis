@@ -101,60 +101,60 @@ Vector<float> InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, s
 }
 
 
-Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, size_t blocksize=1024 * 5, float scale_pwr=100)
-{
-	// Divide grid into chunks to prevent cache invalidations during writing (see Ben Baker migrate)
-	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
-	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
+// Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, size_t blocksize=1024 * 5, float scale_pwr=100)
+// {
+// 	// Divide grid into chunks to prevent cache invalidations during writing (see Ben Baker migrate)
+// 	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
+// 	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
 
-	// const size_t cclen = data_cc.ncol_;
-	const size_t hlen = data_cc.ncol_ / 2;	
-	const size_t ncc = data_cc.nrow_;
-	const size_t ngrid = ttable.ncol_;
-	size_t blocklen;
+// 	// const size_t cclen = data_cc.ncol_;
+// 	const size_t hlen = data_cc.ncol_ / 2;	
+// 	const size_t ncc = data_cc.nrow_;
+// 	const size_t ngrid = ttable.ncol_;
+// 	size_t blocklen;
 
-	uint16_t *tts_sta1, *tts_sta2;
-	float *cc_ptr = nullptr;
-	float *out_ptr = nullptr;
+// 	uint16_t *tts_sta1, *tts_sta2;
+// 	float *cc_ptr = nullptr;
+// 	float *out_ptr = nullptr;
 
-	auto output = Vector<float>(ngrid);
-	output.fill(0);
+// 	auto output = Vector<float>(ngrid);
+// 	output.fill(0);
 
-	// printf("blocksize %lu, ngrid %lu \n", blocksize, ngrid);
+// 	// printf("blocksize %lu, ngrid %lu \n", blocksize, ngrid);
 
-	#pragma omp parallel for private(tts_sta1, tts_sta2, cc_ptr, out_ptr, blocklen)
-	for(size_t iblock = 0; iblock < ngrid; iblock += blocksize) {
+// 	#pragma omp parallel for private(tts_sta1, tts_sta2, cc_ptr, out_ptr, blocklen)
+// 	for(size_t iblock = 0; iblock < ngrid; iblock += blocksize) {
 
-		blocklen = std::min(ngrid - iblock, blocksize);
+// 		blocklen = std::min(ngrid - iblock, blocksize);
 
-		out_ptr = output.data_ + iblock;
-		// out_ptr = output.data_ + iblock * blocklen;
-		// std::fill(out_ptr, out_ptr + blocklen, 0);
+// 		out_ptr = output.data_ + iblock;
+// 		// out_ptr = output.data_ + iblock * blocklen;
+// 		// std::fill(out_ptr, out_ptr + blocklen, 0);
 		
-		for (size_t i = 0; i < ncc; ++i)
-		{				
-			tts_sta1 = ttable.row(ckeys(i, 0)) + iblock;	
-			tts_sta2 = ttable.row(ckeys(i, 1)) + iblock;
-			cc_ptr = data_cc.row(i);
+// 		for (size_t i = 0; i < ncc; ++i)
+// 		{				
+// 			tts_sta1 = ttable.row(ckeys(i, 0)) + iblock;	
+// 			tts_sta2 = ttable.row(ckeys(i, 1)) + iblock;
+// 			cc_ptr = data_cc.row(i);
 
-			// Migrate single ccf on to grid based on tt difference
-			#pragma omp simd \
-			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
-			for (size_t j = 0; j < blocklen; ++j) {
-				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
-			}
-		}
+// 			// Migrate single ccf on to grid based on tt difference
+// 			#pragma omp simd \
+// 			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+// 			for (size_t j = 0; j < blocklen; ++j) {
+// 				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
+// 			}
+// 		}
 
-	}	
+// 	}	
 
-	float norm = scale_pwr / static_cast<float>(ncc);	
-	for(size_t i = 0; i < output.size_; ++i) {
-		output[i] *= norm;
-	}
+// 	float norm = scale_pwr / static_cast<float>(ncc);	
+// 	for(size_t i = 0; i < output.size_; ++i) {
+// 		output[i] *= norm;
+// 	}
 
-	// printf("completed\n");	
-	return output;
-}
+// 	// printf("completed\n");	
+// 	return output;
+// }
 
 void InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, Vector<float>& output, size_t blocksize=1024 * 5, float scale_pwr=100)
 {
@@ -265,6 +265,7 @@ Vector<float> InterLocBlocksPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ck
 
 
 // Delay and summing raw waveforms for all gridlocs for all possible starttimes
+//  requires transposed ttable
 void NaiveSearch(Array2D<float>& data, Array2D<uint16_t>& ttable, size_t tmin, size_t tmax, Vector<float>& wpower, Vector<size_t>& wlocs)
 {
 
@@ -319,7 +320,6 @@ void NaiveSearch(Array2D<float>& data, Array2D<uint16_t>& ttable, size_t tmin, s
 			}
 		}	
 	}
-	// return std::make_tuple(&power, &locs);
 }
 
 // Uses constant velocity medium, introduce random errors

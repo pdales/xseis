@@ -40,6 +40,19 @@ namespace utils {
 
 // }
 
+template<typename T>
+T max(Array2D<T>& arr)
+{
+	return *std::max_element(arr.data_, arr.data_ + arr.size_);
+}
+
+template<typename T>
+T min(Array2D<T>& arr)
+{
+	return *std::min_element(arr.data_, arr.data_ + arr.size_);
+}
+
+
 std::vector<size_t> OverlappingWindows(size_t npts, size_t wlen, float overlap) 
 {
 	std::vector<size_t> wix;

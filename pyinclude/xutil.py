@@ -194,6 +194,25 @@ def bandpass(data, band, sr, corners=4, zerophase=True):
 		return sosfilt(sos, data)
 
 
+def filter(data, btype, band, sr, corners=4, zerophase=True):
+	from scipy.signal import sosfilt, zpk2sos, iirfilter
+	# btype: lowpass, highpass, band
+
+	fe = 0.5 * sr
+
+	z, p, k = iirfilter(corners, band / fe, btype=btype,
+						ftype='butter', output='zpk')
+	sos = zpk2sos(z, p, k)
+	if zerophase:
+		firstpass = sosfilt(sos, data)
+		if len(data.shape) == 1:
+			return sosfilt(sos, firstpass[::-1])[::-1]
+		else:
+			return np.fliplr(sosfilt(sos, np.fliplr(firstpass)))
+	else:
+		return sosfilt(sos, data)
+
+
 def norm2d(d):
 	return d / np.max(np.abs(d), axis=1)[:, np.newaxis]
 
