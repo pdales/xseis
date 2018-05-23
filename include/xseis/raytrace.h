@@ -166,6 +166,8 @@ Array2D<uint16_t> BuildTravelTime1D(Array2D<float>& stalocs, Array2D<float>& gri
 			dxy = process::DistCartesian2D(gl, sl) + std::abs(sl[2]);
 			xdest = (xseed + dxy) / visc_spacing + npad;
 			zdest = (gl[2] + zpad) / visc_spacing + npad;
+			assert(xdest < tgrid.ncol_);
+			assert(zdest < tgrid.nrow_);
 			tt = tgrid(static_cast<size_t>(zdest + 0.5), static_cast<size_t>(xdest + 0.5));
 			ttablerow[j] = static_cast<uint16_t>(tt * sr + 0.5);
 		}

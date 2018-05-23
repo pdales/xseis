@@ -94,18 +94,19 @@ public:
 	}
 
 	T& operator[] (size_t ix) {return data_[ix];}
-	T& operator() (size_t ix){return data_[ix];}
+	// T& operator() (size_t ix){return data_[ix];}
 	T* ptr(size_t ix) {
 		return data_ + ix;
 	}
 	T* begin() {return data_;}
 	T* end() {return data_ + size_;}
 
-	size_t argmax(){
-		return std::distance(data_, std::max_element(data_, data_ + size_));
-	}
+	// size_t argmax(){
+	// 	return std::distance(data_, std::max_element(data_, data_ + size_));
+	// }
 
-	T max(){return *std::max_element(data_, data_ + size_);}
+	// T max(){return *std::max_element(data_, data_ + size_);}
+
 	void fill(T value){std::fill(data_, data_ + size_, value);}
 	
 	void multiply(T value){
@@ -114,16 +115,16 @@ public:
 		}
 	}
 
-	T sum(){
-		T total = 0;
+	float sum(){
+		float total = 0;
 		for (size_t i = 0; i < size_; ++i) {
 			total += data_[i];
 		}
 		return total;
 	}
 
-	T energy(){
-		T total = 0;
+	float energy(){
+		float total = 0;
 		for (size_t i = 0; i < size_; ++i) {
 			total += data_[i] * data_[i];
 		}

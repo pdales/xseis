@@ -62,16 +62,14 @@ Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2
 }
 
 
-Vector<float> InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, float scale_pwr=100)
+void InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, Vector<float>& output, float scale_pwr=100)
 {
 	const size_t hlen = data_cc.ncol_ / 2;	
 	const size_t ngrid = ttable.ncol_;
 
+	output.fill(0);
 
-	auto buf = Vector<float>(ngrid);
-	buf.fill(0);
-
-	float *out_ptr = buf.begin();
+	float *out_ptr = output.begin();
 	float *cc_ptr = nullptr;
 	uint16_t *tts_sta1, *tts_sta2;
 	size_t ix;
@@ -91,13 +89,11 @@ Vector<float> InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, s
 		}
 	}
 
-
 	float norm = scale_pwr / static_cast<float>(ix_patch.size());	
-	for(size_t i = 0; i < buf.size_; ++i) {
-		buf[i] *= norm;
+	for(size_t i = 0; i < output.size_; ++i) {
+		output[i] *= norm;
 	}
 
-	return buf;
 }
 
 

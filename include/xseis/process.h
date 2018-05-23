@@ -33,6 +33,44 @@ const uint MEM_ALIGNMENT = 16;
 namespace process {
 
 
+// template<typename T>
+// T max(T* begin, T* end) {
+// 	return *std::max_element(begin, end);
+// }
+
+// template<typename T>
+// T min(T* begin, T* end) {
+// 	return *std::min_element(begin, end);
+// }
+
+// template<typename T>
+// size_t argmax(T* begin, T* end) {
+// 	return std::distance(begin, std::max_element(begin, end));
+// }
+
+
+template<typename Container>
+float max(Container& data) {
+	return *std::max_element(data.begin(), data.end());
+}
+
+template<typename Container>
+float min(Container& data) {
+	return *std::min_element(data.begin(), data.end());
+}
+
+// template<typename T>
+// T min(T* begin, T* end) {
+// 	return *std::min_element(begin, end);
+// }
+
+
+template<typename Container>
+size_t argmax(Container& data) {
+	return std::distance(data.begin(), std::max_element(data.begin(), data.end()));
+}
+
+
 inline float AngleBetweenPoints(float* a, float*b) 
 {
 	return std::atan((a[1] - b[1]) / (a[0] - b[0]));

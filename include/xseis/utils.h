@@ -40,17 +40,12 @@ namespace utils {
 
 // }
 
-template<typename T>
-T max(Array2D<T>& arr)
-{
-	return *std::max_element(arr.data_, arr.data_ + arr.size_);
-}
+	// size_t argmax(){
+	// 	return std::distance(data_, std::max_element(data_, data_ + size_));
+	// }
 
-template<typename T>
-T min(Array2D<T>& arr)
-{
-	return *std::min_element(arr.data_, arr.data_ + arr.size_);
-}
+	// T max(){return *std::max_element(data_, data_ + size_);}
+
 
 
 std::vector<size_t> OverlappingWindows(size_t npts, size_t wlen, float overlap) 
