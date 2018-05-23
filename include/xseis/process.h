@@ -92,6 +92,11 @@ inline float DistCartesian2D(float* a, float* b)
 	return std::sqrt(dx * dx + dy * dy);
 }
 
+
+float DistDiff(float* a, float* b, float* c) {	
+	return DistCartesian(a, c) - DistCartesian(b, c);
+}
+
 uint mod_floor(int a, int n) {
 	return ((a % n) + n) % n;
 }

@@ -15,6 +15,17 @@ from matplotlib.pyplot import rcParams
 rcParams['figure.figsize'] = 11, 8
 
 
+def sigs_shift(d, shifts, labels=None, **kwargs):
+	
+	for i, sig in enumerate(d):
+		tmp = sig / np.max(np.abs(sig)) + shifts[i]
+		plt.plot(tmp, **kwargs)
+
+	if labels is not None:
+		for i, lbl in enumerate(labels):
+			plt.text(0, shifts[i] + 0.1, lbl, fontsize=15)
+
+
 def v2color(vals):
 
 	cnorm  = plt.Normalize(vmin=np.nanmin(vals), vmax=np.nanmax(vals))

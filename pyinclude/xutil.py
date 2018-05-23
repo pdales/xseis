@@ -17,6 +17,28 @@ import math
 from scipy.fftpack import fft, ifft, rfft, fftfreq
 
 
+def roll_data(data, tts):
+	droll = np.zeros_like(data)
+
+	for i, sig in enumerate(data):
+		droll[i] = np.roll(sig, -tts[i])
+	return droll
+
+
+def comb_channels(data, cmap):
+
+	groups = []
+	for grp in np.unique(cmap):
+		groups.append(np.where(cmap == grp)[0])
+
+	dstack = np.zeros((len(groups), data.shape[1]))
+
+	for i, grp in enumerate(groups):
+		dstack[i] = np.sum(np.abs(data[grp]), axis=0)
+
+	return dstack
+
+	
 def mlab_coords(locs, lims, spacing):
 	return (locs - lims[:, 0]).T / spacing
 
