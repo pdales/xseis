@@ -102,58 +102,8 @@ struct Dataset {
 		return vec;
 	}
 
-
-	// Array2D<float> load_float_array() {
-	// 	auto arr = Array2D<float>({(size_t) nrow_, (size_t) ncol_});
-	// 	H5::DataSpace mspace(rank_, shape_);
-	// 	dset_.read(arr.data_, dtype_, mspace, filespace_);
-	// 	return arr;		
-	// }
-
-	// Array2D<double> load_double_array() {
-	// 	auto arr = Array2D<double>({(size_t) nrow_, (size_t) ncol_});
-	// 	H5::DataSpace mspace(rank_, shape_);
-	// 	dset_.read(arr.data_, dtype_, mspace, filespace_);
-	// 	return arr;		
-	// }
-
-	// Array2D<int> load_int_array() {
-	// 	auto arr = Array2D<int>({(size_t) nrow_, (size_t) ncol_});
-	// 	H5::DataSpace mspace(rank_, shape_);
-	// 	dset_.read(arr.data_, dtype_, mspace, filespace_);
-	// 	return arr;		
-	// }
-
-	// Array2D<uint16_t> load_uint16_array() {
-	// 	auto arr = Array2D<uint16_t>({(size_t) nrow_, (size_t) ncol_});
-	// 	H5::DataSpace mspace(rank_, shape_);
-	// 	dset_.read(arr.data_, dtype_, mspace, filespace_);
-	// 	return arr;		
-	// }
-
-	// Vector<float> load_float_vector() {
-	// 	auto vec = Vector<float>((size_t) nrow_);
-	// 	H5::DataSpace mspace(1, shape_);
-	// 	dset_.read(vec.data_, dtype_, mspace, filespace_);
-	// 	return vec;
-	// }
-
-	// Vector<int> load_int_vector() {
-	// 	auto vec = Vector<int>((size_t) nrow_);
-	// 	H5::DataSpace mspace(1, shape_);
-	// 	dset_.read(vec.data_, dtype_, mspace, filespace_);
-	// 	return vec;
-	// }
-
-	// Vector<uint16_t> load_uint16_vector() {
-	// 	auto vec = Vector<uint16_t>((size_t) nrow_);
-	// 	H5::DataSpace mspace(1, shape_);
-	// 	dset_.read(vec.data_, dtype_, mspace, filespace_);
-	// 	return vec;
-	// }
-
-
 };
+
 
 // wrapper for h5 file
 struct File {
@@ -167,11 +117,11 @@ struct File {
 		return Dataset(hfile.openDataSet(dset_name));
 	}
 
-	template <typename T>
-	void read_attr(const H5std_string attr_name, T val){		 
-		H5::Attribute attr = hfile.openAttribute(attr_name);
-		attr.read(attr.getDataType(), val);
-	}
+	// template <typename T>
+	// void read_attr(const H5std_string attr_name, T val){		 
+	// 	H5::Attribute attr = hfile.openAttribute(attr_name);
+	// 	attr.read(attr.getDataType(), val);
+	// }
 
 	template <typename T>
 	T load_attr(const H5std_string attr_name){
