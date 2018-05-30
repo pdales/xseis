@@ -274,6 +274,8 @@ void NaiveSearch(Array2D<float>& data, Array2D<uint16_t>& ttable, size_t tmin, s
 	// auto tt_ixs = Vector<size_t>(nsig);	
 	auto tmp_stack = Vector<float>(nt);
 
+	process::Fill(wpower, 0);
+
 	float* best_vals = wpower.data_;
 	size_t* best_locs = wlocs.data_;
 	// auto win_val = Vector<float>(nt);
@@ -317,6 +319,81 @@ void NaiveSearch(Array2D<float>& data, Array2D<uint16_t>& ttable, size_t tmin, s
 		}	
 	}
 }
+
+
+// Delay and summing raw waveforms for all gridlocs for all possible starttimes
+//  requires transposed ttable
+void MFPSum(Array2D<float>& data, Array2D<uint16_t>& ttable, uint32_t wlen, std::vector<size_t> otimes, fftwf_plan& plan_fwd, Vector<float>& wpower, Vector<size_t>& wlocs)
+{
+
+	// std::cout << data.nrow_ << '\n';
+	// std::cout << ttable.ncol_ << '\n';
+	size_t nt = otimes.size();
+	size_t nsig = data.nrow_;
+	size_t ngrid = ttable.nrow_;
+
+	uint32_t hlen = wlen / 2;
+
+	// auto tt_ixs = Vector<size_t>(nsig);	
+	auto tmp_stack = Vector<float>(nt);
+
+	process::Fill(wpower, 0);
+	float* best_vals = wpower.data_;
+	size_t* best_locs = wlocs.data_;
+
+	// size_t nfreq = wlen / 2 + 1;
+	// auto fstack = Vector<fftwf_complex>(nfreq);
+	// // auto fsig = Vector<fftwf_complex>(nfreq);
+	// // auto fptr = fsig.data_;
+	// auto fptr = fftwf_alloc_complex(nfreq);
+
+	auto fstack = Vector<float>(nfreq);
+
+	// printf("Searching grid points: %lu to %lu\n", gix_start, gix_end);
+
+	std::cout << "nt: " << nt << '\n';
+	std::cout << "ngrid: " << ngrid << '\n';
+	std::cout << "nsig: " << nsig << '\n';
+
+	for (size_t ipt = 0; ipt < ngrid; ++ipt)
+	{	
+		tmp_stack.fill(0);
+		uint16_t *tt_ixs = ttable.row(ipt);
+
+		if (ipt % 1000 == 0) {
+			printf("Progress: %.2f \n", ((float)(ipt) / (ngrid) * 100));
+		}
+
+		for (size_t i = 0; i < nt; ++i) 
+		{
+			size_t ot = otimes[i];
+			process::Fill(fstack, 0);
+			printf("Ot: %lu \n", ot);			
+		
+			for (size_t j = 0; j < nsig; ++j) 
+			{
+				// std::cout << "j: " << j << '\n';
+				// float *dptr = data.row(j) + ot + tt_ixs[j] - hlen;
+				float *dptr = data.row(j) + tt_ixs[j];
+				fftwf_execute_dft_r2c(plan_fwd, dptr, fptr);
+				std::cout << "descrip: " << ot + tt_ixs[j] - hlen << '\n';
+				process::Accumulate(fptr, fstack.data_, nfreq);
+			}
+
+			tmp_stack[i] = process::Energy(fstack.data_, nfreq);
+		}
+
+		// #pragma omp simd aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+		for (size_t j = 0; j < nt; ++j) 
+		{
+			if (std::abs(tmp_stack[j]) > std::abs(best_vals[j])) {
+				best_vals[j] = tmp_stack[j];
+				best_locs[j] = ipt;
+			}
+		}	
+	}
+}
+
 
 // Uses constant velocity medium, introduce random errors
 Array2D<uint16_t> BuildTTablePerturbVel(Array2D<float>& stalocs, Array2D<float>& gridlocs, float vel, float sr, float perturb)

@@ -24,12 +24,11 @@ namespace raytrace {
 
 Array2D<uint16_t> TTableFromVisc1D(Array2D<float>& stalocs, Array2D<float>& gridlocs,
 									Array2D<double>& viscosity, Array2D<int>& tag,
-									float sr)
+									const float visc_spacing, float sr)
 {
 	// consts used to make grids
 	const size_t ndim = 2;
-	const size_t npad = 2;
-	const size_t visc_spacing = 5;
+	const size_t npad = 2;	
 	const float zshift = 500;
 	const float xseed = 100;
 
@@ -61,7 +60,7 @@ Array2D<uint16_t> TTableFromVisc1D(Array2D<float>& stalocs, Array2D<float>& grid
 	
 	// #pragma omp parallel for private(ttablerow, sl, gl, dxy, xdest, zdest, tt, zseed)
 	for(size_t i = 0; i < nsta; ++i) {
-		// printf("%lu\n", i);
+		printf("%lu\n", i);
 		ttablerow = ttable.row(i);
 		sl = stalocs.row(i);
 

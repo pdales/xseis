@@ -25,8 +25,6 @@ Seems that c++ vectorizes by default when optimizations on.
 
 #include "xseis/structures.h"
 
-const uint MEM_ALIGNMENT = 16;
-
 // typedef std::pair<float, std::array<float, 3> > vpair;
 // typedef std::priority_queue<vpair, std::vector<vpair>, std::greater<vpair>> fe_queue;
 
@@ -564,6 +562,54 @@ void SlidingWinMax(float *sig, size_t npts, size_t wlen)
 	}
 
 }
+
+
+void Fill(Vector<fftwf_complex>& data, float val)
+{		
+	for(size_t i = 0; i < data.size_; ++i) {
+		data[i][0] = val;
+		data[i][1] = val;
+	}
+}
+
+void Fill(Vector<float>& data, float val)
+{		
+	for(size_t i = 0; i < data.size_; ++i) {
+		data[i] = val;		
+	}
+}
+
+
+void Accumulate(fftwf_complex const *data, fftwf_complex *stack, size_t npts)
+{		
+	for(size_t i = 0; i < npts; ++i) {
+		stack[i][0] += data[i][0];
+		stack[i][1] += data[i][1];
+	}
+}
+
+// float Energy(Vector<fftwf_complex>& data)
+// {	
+// 	float energy = 0;
+
+// 	for(size_t i = 0; i < data.size_; ++i) {
+// 		stack[i][0] += data[i][0];
+// 		stack[i][1] += data[i][1];
+// 	}
+// }
+
+
+#pragma omp declare simd aligned(sig:MEM_ALIGNMENT)
+float Energy(fftwf_complex const *sig, uint32_t const nfreq)
+{
+	float tmp = 0;
+	#pragma omp simd aligned(sig:MEM_ALIGNMENT)
+	for (uint32_t i = 0; i < nfreq; ++i){
+		tmp += sig[i][0] * sig[i][0] + sig[i][1] * sig[i][1];
+	}
+	return tmp;
+}
+
 
 
 // void SlidingAverage(float *sig, size_t npts, size_t wlen)

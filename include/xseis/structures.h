@@ -16,6 +16,9 @@ ndim array library.
 
 /// namespace structures {
 
+const uint MEM_ALIGNMENT = 16;
+
+
 template <typename T>
 class Vector {	
 public:
@@ -129,9 +132,33 @@ public:
 			total += data_[i] * data_[i];
 		}
 		return total;
-	}
-	
+	}	
 };
+
+
+
+// struct alignas(16) sse_t
+// {
+//   float sse_data[4];
+// };
+
+// template <typename TItem>
+// TItem* aligned_alloc(const size_t SIZE, const uint32_t ALIGNMENT)
+// {
+// 	// typedef float TItem;
+// 	// static const int SIZE = 100;
+// 	// static const int ALIGNMENT = 16;
+
+// 	// allocate heap storage larger then SIZE
+// 	TItem* storage = new TItem[SIZE + (ALIGNMENT / sizeof(TItem))];
+// 	void* storage_ptr = (void*)storage;
+// 	size_t storage_size = sizeof(TItem) * (SIZE + 1);
+// 	// aligned_array should be properly aligned
+// 	TItem* aligned_array = (TItem*) align(MEM_ALIGNMENT, sizeof(TItem) * SIZE, storage_ptr, storage_size);
+// 	if (!aligned_array) { throw std::bad_alloc(); }
+
+// 	return aligned_array;
+// }
 
 template <typename T>
 class Array2D {
@@ -158,6 +185,7 @@ public:
 	: nrow_(nrow), ncol_(ncol), owns_(true){
 		size_ = (size_t) nrow_ * ncol_;
 		data_ = size_ ? new T[size_]() : nullptr;
+		// data_ = alignas(64) new T[size_]();		
 	}
 
 	// init from std::vector, copies data
@@ -262,7 +290,6 @@ public:
 	Array2D<T> transpose() {
 
 		auto arr = Array2D<T>(ncol_, nrow_);
-
 
 		T *out_ptr = nullptr;
 
