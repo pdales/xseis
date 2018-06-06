@@ -12,41 +12,30 @@
 #include "xseis/structures.h"
 namespace utils {
 
-// copy-assignment contructor (needed to create std::vector of arrays)
-// template<typename T>
-// Array2D(const Array2D& other) : nrow_(other.nrow_), ncol_(other.ncol_), size_(other.size_),
-// 	  data_(size_ ? new T[size_]() : nullptr), owns_(true)
-// {
-// 	std::copy(other.data_, other.data_ + size_, data_);
-// 	std::cout << "Warning: copying Array2D of size " << size_ << '\n';
-// }
-
-
-// template<typename T>
-// Array2D<T> ConcatenateRows(Array2D<T>& a1, Array2D<T>& a2) {
+template<typename T>
+size_t PadToBytes(const size_t size, const uint32_t nbytes=CACHE_LINE)
+{    
+	const uint32_t paddingElements = nbytes / sizeof(T);    
+	const uint32_t mod = size % paddingElements;
+	uint32_t ipad;
 	
-// 	size_t nrow = a1.nrow_ + a2.nrow_;
-// 	size_t ncol = a1.ncol_;
+	mod == 0 ? ipad = 0 : ipad = paddingElements - mod;
+	return size + ipad;	
+}
 
-// 	auto ac = Array2D<T>(nrow, ncol);
+std::vector<size_t> WinsAlignedF32(size_t npts, size_t wlen, float overlap) 
+{
+	std::vector<size_t> wix;
+	size_t dx = PadToBytes<float>((1 - overlap) * wlen);
 
-// 	float *drow = nullptr;
-// 	for(unsigned i = 0; i < keys.size_; ++i) {
-// 		drow = data.row(kc[i]);
-// 		std::copy(drow, drow + data.ncol_, dnew.row(i));		
-// 	}
-
-// 	return dnew;
-
-// }
-
-	// size_t argmax(){
-	// 	return std::distance(data_, std::max_element(data_, data_ + size_));
-	// }
-
-	// T max(){return *std::max_element(data_, data_ + size_);}
-
-
+	std::cout << "actual_overlap: " <<  1.0 - (float) dx / wlen << "%\n";
+	size_t ix = 0;
+	while(ix < (npts - wlen)) {
+		wix.push_back(ix);
+		ix += dx;
+	}
+	return wix;				
+}
 
 std::vector<size_t> OverlappingWindows(size_t npts, size_t wlen, float overlap) 
 {
@@ -239,6 +228,20 @@ void CopyArrayDataOffset(Array2D<float>& data_in, uint32_t offset, Array2D<float
 // 	}
 // }
 
+template <typename T>
+void print(std::vector<T> &vec){	
+	printf("\n[");
+	std::cout.precision(4);
+	int trunc = 100;
+
+	for (int i = 0; i < vec.size(); ++i) {
+		std::cout << vec[i] << " ";
+		if (i > trunc) {printf("..\n"); break;}		
+		// printf("%.1f ", float(data[i]));
+	}
+	printf("]\n");
+}
+
 
 template <typename T>
 void print(Vector<T> &vec){	
@@ -427,6 +430,42 @@ std::string ZeroPadInt(unsigned val, unsigned npad=5){
 void PrintMaxAndLoc(std::vector<float> v){
 	printf("%.6f (max) @ [%.0f, %.0f, %.0f] \n", v[0], v[1], v[2], v[3]);
 }
+
+
+
+// copy-assignment contructor (needed to create std::vector of arrays)
+// template<typename T>
+// Array2D(const Array2D& other) : nrow_(other.nrow_), ncol_(other.ncol_), size_(other.size_),
+// 	  data_(size_ ? new T[size_]() : nullptr), owns_(true)
+// {
+// 	std::copy(other.data_, other.data_ + size_, data_);
+// 	std::cout << "Warning: copying Array2D of size " << size_ << '\n';
+// }
+
+
+// template<typename T>
+// Array2D<T> ConcatenateRows(Array2D<T>& a1, Array2D<T>& a2) {
+	
+// 	size_t nrow = a1.nrow_ + a2.nrow_;
+// 	size_t ncol = a1.ncol_;
+
+// 	auto ac = Array2D<T>(nrow, ncol);
+
+// 	float *drow = nullptr;
+// 	for(unsigned i = 0; i < keys.size_; ++i) {
+// 		drow = data.row(kc[i]);
+// 		std::copy(drow, drow + data.ncol_, dnew.row(i));		
+// 	}
+
+// 	return dnew;
+
+// }
+
+	// size_t argmax(){
+	// 	return std::distance(data_, std::max_element(data_, data_ + size_));
+	// }
+
+	// T max(){return *std::max_element(data_, data_ + size_);}
 
 }
 

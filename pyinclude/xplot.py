@@ -15,8 +15,10 @@ from matplotlib.pyplot import rcParams
 rcParams['figure.figsize'] = 11, 8
 
 
-def sigs_shift(d, shifts, labels=None, **kwargs):
-	
+def sigs(d, shifts=None, labels=None, **kwargs):
+	if shifts is None:
+		shifts = np.arange(0, d.shape[0], 1) * 1.0
+
 	for i, sig in enumerate(d):
 		tmp = sig / np.max(np.abs(sig)) + shifts[i]
 		plt.plot(tmp, **kwargs)
@@ -155,7 +157,7 @@ def freq(sig, sr, xlim=None):
 	plt.show()
 
 
-def sigs(d, spacing=10, labels=None, vlines=None):
+def sigs_old(d, spacing=10, labels=None, vlines=None):
 
 	if vlines is not None:
 		for v in vlines:

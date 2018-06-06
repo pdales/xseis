@@ -13,10 +13,29 @@ ndim array library.
 #include <chrono>
 #include <vector>
 #include <algorithm>
+#include <assert.h>
 
 /// namespace structures {
 
-const uint MEM_ALIGNMENT = 16;
+const uint32_t CACHE_LINE = 64;
+// const uint32_t MEM_ALIGNMENT = 16;
+const uint32_t MEM_ALIGNMENT = CACHE_LINE;
+// auto ptr2 = (float*) aligned_alloc(10 * sizeof(float), CACHE_LINE);
+
+// template <typename T>
+// void assert_aligned(T *ptr)
+// {
+// 	// assert((uintptr_t) ptr * sizeof(T) % MEM_ALIGNMENT == 0);
+// 	assert((uintptr_t) ptr % MEM_ALIGNMENT == 0);
+// }
+	
+
+
+template <typename T>
+T* malloc_cache_align(const size_t N)
+{
+	return (T*) aligned_alloc(MEM_ALIGNMENT, N * sizeof(T));
+}
 
 
 template <typename T>
@@ -35,21 +54,22 @@ public:
 
 	// init and allocate dynamic memory
 	Vector(size_t size)
-	: size_(size), data_(size_ ? new T[size_]() : nullptr), owns_(true)
+	: size_(size), data_(size_ ? malloc_cache_align<T>(size_) : nullptr), owns_(true)
 	{}
 
 	// init from std::vector, copies data
-	Vector(std::vector<T>& vec): size_(vec.size()), data_(new T[size_]()), owns_(true){
+	Vector(std::vector<T>& vec): size_(vec.size()), data_(malloc_cache_align<T>(size_)), owns_(true){
 		std::copy(vec.begin(), vec.end(), data_);
 	} 
 
 
 	// destructor
-	~Vector(){if (owns_ == true) {delete [] data_;}}
+	// ~Vector(){if (owns_ == true) {delete [] data_;}}
+	~Vector(){if (owns_ == true) {free(data_);}}
 	
 	// copy-assignment contructor
 	Vector(const Vector& other) : size_(other.size_),
-		  data_(size_ ? new T[size_]() : nullptr), owns_(true)
+		  data_(size_ ? malloc_cache_align<T>(size_) : nullptr), owns_(true)
 	{
 		std::cout << "Warning: copying Vector of size " << size_ << '\n';
 		std::copy(other.data_, other.data_ + size_, data_);
@@ -160,20 +180,23 @@ public:
 // 	return aligned_array;
 // }
 
+// template <typename T>
+// struct alignas(64) Aligned { T x;};
+
 template <typename T>
 class Array2D {
 public:
 	// std::unique_ptr<T> data_ = nullptr;
-	size_t nrow_ = 0;
-	size_t ncol_ = 0;
-	size_t size_ = 0;
+	size_t nrow_;
+	size_t ncol_;
+	size_t size_;
 	// size_t shape_[2];
-	T *data_ = nullptr;
-	bool owns_ = true;
-
+	T *data_;
+	bool owns_;
 
 	// default constructor
-	Array2D() {}
+	Array2D() :data_(nullptr), nrow_(0), ncol_(0), size_(0), owns_(true)
+	{}
 
 	// init from existing c-array with optional ownership
 	Array2D(T *data, size_t nrow, size_t ncol, bool owns=true)	 
@@ -184,23 +207,28 @@ public:
 	Array2D(size_t nrow, size_t ncol)
 	: nrow_(nrow), ncol_(ncol), owns_(true){
 		size_ = (size_t) nrow_ * ncol_;
-		data_ = size_ ? new T[size_]() : nullptr;
-		// data_ = alignas(64) new T[size_]();		
+		data_ = size_ ? malloc_cache_align<T>(size_) : nullptr;
+		// int* a = (int*) _aligned_malloc(10 * sizeof(int), 4096);
+
+		// data_ = new Aligned<T>[size_];
+		// data_ = new alignas(CACHE_LINE) T[size_];
+		// new[](std::size_t size, std::align_val_t alignment)
 	}
 
 	// init from std::vector, copies data
 	Array2D(std::vector<T>& vec, size_t ncol): nrow_(vec.size() / ncol), ncol_(ncol), size_(vec.size()), owns_(true){
-		data_ = new T[size_]();
+		data_ = malloc_cache_align<T>(size_);
 		std::copy(vec.begin(), vec.end(), data_);
 	} 
 
 
 	// destructor
-	~Array2D(){if (owns_ == true) {delete [] data_;}}
+	// ~Array2D(){if (owns_ == true) {delete [] data_;}}
+	~Array2D(){if (owns_ == true) {free(data_);}}
 	
 	// copy-assignment contructor (needed to create std::vector of arrays)
 	Array2D(const Array2D& other) : nrow_(other.nrow_), ncol_(other.ncol_), size_(other.size_),
-		  data_(size_ ? new T[size_]() : nullptr), owns_(true)
+		  data_(size_ ? malloc_cache_align<T>(size_) : nullptr), owns_(true)
 	{
 		std::copy(other.data_, other.data_ + size_, data_);
 		std::cout << "Warning: copying Array2D of size " << size_ << '\n';
@@ -259,7 +287,7 @@ public:
 
 
 	// Return pointer to i'th row
-	T* row(size_t irow) {
+	inline T* row(size_t const irow) {
 		return data_ + (irow * ncol_);
 	}
 

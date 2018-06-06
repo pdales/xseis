@@ -27,10 +27,11 @@ def roll_data(data, tts):
 
 def comb_channels(data, cmap):
 
-	groups = []
-	for grp in np.unique(cmap):
-		groups.append(np.where(cmap == grp)[0])
+	# groups = []
+	# for grp in np.unique(cmap):
+	# 	groups.append(np.where(cmap == grp)[0])
 
+	groups = [np.where(sk == cmap)[0] for sk in np.unique(cmap)]
 	dstack = np.zeros((len(groups), data.shape[1]))
 
 	for i, grp in enumerate(groups):

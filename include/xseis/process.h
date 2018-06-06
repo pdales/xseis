@@ -100,10 +100,10 @@ uint mod_floor(int a, int n) {
 }
 
 
-std::vector<fftwf_complex> BuildPhaseShiftVec(size_t const nfreq, long const nshift) {
+Vector<fftwf_complex> BuildPhaseShiftVec(size_t const nfreq, long const nshift) {
 	
-	// auto v = Vector<fftwf_complex>(nfreq);
-	std::vector<fftwf_complex> v(nfreq);
+	auto v = Vector<fftwf_complex>(nfreq);
+	// std::vector<fftwf_complex> v(nfreq);
 	float const fstep = 0.5 / (nfreq - 1);
 	float const factor = -nshift * 2 * M_PI * fstep;
 
@@ -135,7 +135,8 @@ void Convolve(fftwf_complex* sig1, fftwf_complex* sig2, uint32_t const nfreq)
 
 // Cross-correlate complex signals, cc(f) = s1(f) x s2*(f)
 #pragma omp declare simd aligned(sig1, sig2, out:MEM_ALIGNMENT)
-void XCorr(fftwf_complex* sig1, fftwf_complex* sig2, fftwf_complex* out, uint32_t nfreq)
+void XCorr(fftwf_complex const* const sig1, fftwf_complex const* const sig2,
+		   fftwf_complex* const out, uint32_t const nfreq)
 {
 	#pragma omp simd aligned(sig1, sig2, out:MEM_ALIGNMENT)
 	for (uint32_t i = 0; i < nfreq; ++i){
@@ -144,28 +145,28 @@ void XCorr(fftwf_complex* sig1, fftwf_complex* sig2, fftwf_complex* out, uint32_
 	}
 }
 
-// Cross-correlate signal pairs of fdata and output to fdata_cc
-void XCorrPairs(Array2D<fftwf_complex>& fdata, Array2D<uint16_t>& ckeys, Array2D<fftwf_complex>& fdata_cc)
-{	
-	uint32_t nfreq = fdata.ncol_;
+// // Cross-correlate signal pairs of fdata and output to fdata_cc
+// void XCorrPairs(Array2D<fftwf_complex>& fdata, Array2D<uint16_t>& ckeys, Array2D<fftwf_complex>& fdata_cc)
+// {	
+// 	uint32_t nfreq = fdata.ncol_;
 
-	#pragma omp for
-	for (size_t i = 0; i < ckeys.nrow_; ++i)
-	{
-		// std::cout << "npair: " << i << '\n';
-		XCorr(fdata.row(ckeys(i, 0)), fdata.row(ckeys(i, 1)),
-			 fdata_cc.row(i), nfreq);
-	}
+// 	#pragma omp for
+// 	for (size_t i = 0; i < ckeys.nrow_; ++i)
+// 	{
+// 		// std::cout << "npair: " << i << '\n';
+// 		XCorr(fdata.row(ckeys(i, 0)), fdata.row(ckeys(i, 1)),
+// 			 fdata_cc.row(i), nfreq);
+// 	}
 
-}
+// }
 
 
-#pragma omp declare simd aligned(data:MEM_ALIGNMENT)
+// #pragma omp declare simd aligned(data:MEM_ALIGNMENT)
 template <typename T, typename F>
 void ApplyFuncToRows(T *__restrict__ data, size_t nsig, size_t npts, F* func){
 	// Generic map function
 
-	#pragma omp for simd aligned(data:MEM_ALIGNMENT)
+	// #pragma omp for simd aligned(data:MEM_ALIGNMENT)
 	for (size_t i = 0; i < nsig; i++)
 	{
 		(*func)(data + (i * npts), npts);
@@ -224,7 +225,7 @@ Vector<float> BuildFreqFilter(std::vector<float>& corner_freqs, uint nfreq, floa
 
 }
 
-void ApplyFreqFilterReplace(float (*fdata)[2], uint nfreq, Vector<float>& filter)
+void ApplyFreqFilterReplace(float (*fdata)[2], uint const nfreq, Vector<float>& filter)
 {
 	float angle;
 
@@ -588,19 +589,9 @@ void Accumulate(fftwf_complex const *data, fftwf_complex *stack, size_t npts)
 	}
 }
 
-// float Energy(Vector<fftwf_complex>& data)
-// {	
-// 	float energy = 0;
-
-// 	for(size_t i = 0; i < data.size_; ++i) {
-// 		stack[i][0] += data[i][0];
-// 		stack[i][1] += data[i][1];
-// 	}
-// }
-
 
 #pragma omp declare simd aligned(sig:MEM_ALIGNMENT)
-float Energy(fftwf_complex const *sig, uint32_t const nfreq)
+float Energy(const fftwf_complex *sig, uint32_t const nfreq)
 {
 	float tmp = 0;
 	#pragma omp simd aligned(sig:MEM_ALIGNMENT)
@@ -610,300 +601,25 @@ float Energy(fftwf_complex const *sig, uint32_t const nfreq)
 	return tmp;
 }
 
-
-
-// void SlidingAverage(float *sig, size_t npts, size_t wlen)
-// {
-// 	if (wlen % 2 == 0){wlen += 1;}
-
-// 	float buf[wlen];
-// 	float curr_sum = 0;
-
-// 	size_t buf_idx = 0;
-// 	size_t hlen = wlen / 2 + 1;	
-
-// 	// Do initial buffer fill
-// 	for (size_t i = npts - wlen; i < npts; ++i) {
-// 		buf[i] = sig[i];
-// 		curr_sum += buf[i];
-// 	}
-
-// 	float wlen_f = static_cast<float>(wlen);
-// 	float buf_in = sig[wlen];	
-// 	size_t iwrap = 0;
-// 	// Handle edge case with wrapping
-// 	for (size_t i = npts - hlen; i < npts + hlen; ++i) {
-// 		// iwrap = ;
-// 		sig[i % npts] = curr_sum / wlen_f;
-
-// 		buf_in = sig[(i + hlen) % npts];
-// 		buf[buf_idx] = sig[(i - 1 + hlen) % npts];
-// 		buf_idx = (buf_idx + 1) % wlen;
-
-// 		curr_sum += buf_in - buf[buf_idx];
-
-// 		// buf[i] = sig[iwrap];
-// 		// curr_sum += sig[iwrap];
-// 	}
-
-// 		// 	if (i < half_len || i >= sig_len - half_len){
-// 		// 	sig[i] = curr_sum / win_len;
-// 		// 	continue;
-// 		// }
-// 		// curr_sum += buf_in - buf[buf_idx];
-// 		// sig[i] = curr_sum / win_len;
-
-// 		// buf_in = sig[i + half_len];
-// 		// buf[buf_idx] = sig[i - 1 + half_len];
-// 		// buf_idx = (buf_idx + 1) % win_len;
-
-// 	// compute in place sliding avg using ring buffer
-// 	for (size_t i = 0; i < npts; ++i) {
-		
-// 		curr_sum += buf_in - buf[buf_idx];
-// 		sig[i] = curr_sum / wlen;
-
-// 		buf_in = sig[i + hlen];
-// 		buf[buf_idx] = sig[i - 1 + hlen];
-// 		buf_idx = (buf_idx + 1) % wlen;
-// 	}
-// }
-
-// void SlidingRMS(float *sig, size_t npts, size_t wlen)
-// {
-// 	square_signal(sig, npts);
-// 	SlidingAverage(sig, npts, wlen);
-// 	root_signal(sig, npts);
-// }
-
-
-
-// void correlate_all_parallel(float (*fdata)[2], int nsig, int nfreq, float (*fdata_cc)[2], uint32_t *pairs, int npairs, int nthreads)
-// {
-// 	std::vector<std::thread> pool;
-
-// 	int start, end, npairs_chunk;
-// 	float (*ptr_out)[2] = nullptr;
-// 	uint32_t *ptr_pairs = nullptr;
-
-// 	for (int i = 0; i < nthreads; i++){
-
-// 		start = floor(i * npairs / nthreads);
-// 		end = floor((i + 1) * npairs / nthreads);
-// 		ptr_out = fdata_cc + (start * nfreq);
-// 		ptr_pairs = pairs + (start * 2);
-
-// 		npairs_chunk = end - start;
-// 		// printf("range [%d: %d] npairs: %d \n", start, end, npairs_chunk);
-// 		// printf("startval = %.2f \n", ptr_out[0][0]);
-
-// 		pool.push_back(std::thread(correlate_all, fdata, nsig, nfreq, ptr_out,
-// 									 ptr_pairs, npairs_chunk));
-// 	}
-// 	for (std::thread& t : pool){
-// 		t.join();
-// 	}
-// }
-
-
-// void correlate_all(float (*fdata)[2], int nsig, int nfreq, float (*fdata_cc)[2],
-// 				 uint32_t *pairs, int npairs)
-// {
-// 	int key1, key2;
-// 	float (*sig1)[2] = nullptr;
-// 	float (*sig2)[2] = nullptr;
-// 	float (*sigcc)[2] = nullptr;
-
-// 	#pragma omp for
-// 	for (int i = 0; i < npairs; ++i)
-// 	{
-// 		key1 = pairs[i * 2];
-// 		key2 = pairs[i * 2 + 1];
-
-// 		sig1 = fdata + (key1 * nfreq);
-// 		sig2 = fdata + (key2 * nfreq);
-// 		sigcc = fdata_cc + (i * nfreq);
-
-// 		XCorr(sig1, sig2, sigcc, nfreq);
-// 	}
-// }
-
-
-// void XCorrPairs(Array2D<fftwf_complex>& fdata, Array2D<uint32_t>& pairs, Array2D<fftwf_complex>& fdata_cc)
-// {	
-// 	uint32_t nfreq = fdata.ncol_;
-
-// 	#pragma omp for
-// 	for (uint32_t i = 0; i < pairs.nrow_; ++i)
-// 	{
-// 		XCorr(fdata.row(pairs(i, 0)), fdata.row(pairs(i, 1)),
-// 			 fdata_cc.row(i), nfreq);
-// 	}
-// }
-
-
-// void WhitenSpectrum(float (*fdata)[2], int nfreq, float sr, std::vector<float> filt_shape)
-// {
-// 	float fmin = filt_shape[0];
-// 	float fmax = filt_shape[1];
-// 	float len_taper_ratio = filt_shape[2];
-// 	// uint len_taper = len_taper_ratio * nfreq;
-// 	int len_taper = len_taper_ratio * nfreq;
-// 	// printf("ntaper %d\n", len_taper);
-
-// 	float fsr = (nfreq * 2 - 1) / sr;
-// 	// whiten corners:  cutmin--porte1---porte2--cutmax
-// 	int porte1 = fsr * fmin;
-// 	int porte2 = fsr * fmax;
-
-// 	int cutmin = std::max(porte1 - len_taper, 1);
-// 	int cutmax = std::min(porte2 + len_taper, nfreq);
-// 	float angle;
-// 	float amp;
-
-// 	// printf("%.8f fHz  %d npts_taper \n", fsr, npts_taper);
-// 	// printf("%d %d %d %d \n", cutmin, porte1, porte2, cutmax);
-// 	int wlen = porte1 - cutmin;
-// 	float cosm = M_PI / (2. * wlen);
-
-// 	// whiten signal from cutmin to cutmax
-// 	for (int i = 0; i < cutmin; ++i) {
-// 		fdata[i][0] = 0.0;
-// 		fdata[i][1] = 0.0;
-// 	}
-
-// 	// left hand taper
-// 	for (int i = cutmin; i < porte1; ++i) {
-// 		amp = std::pow(std::cos((porte1 - (i + 1) ) * cosm), 2.0);
-// 		angle = std::atan2(fdata[i][1], fdata[i][0]);
-// 		fdata[i][0] = amp * std::cos(angle);
-// 		fdata[i][1] = amp * std::sin(angle);
-// 	}
-
-// 	// setin middle freqs amp = 1
-// 	for (int i = porte1; i < porte2; ++i) {
-// 		angle = std::atan2(fdata[i][1], fdata[i][0]);
-// 		fdata[i][0] = std::cos(angle);
-// 		fdata[i][1] = std::sin(angle);
-// 	}
-
-// 	wlen = cutmax - porte2;
-// 	cosm = M_PI / (2. * wlen);
-
-// 	// right hand taper
-// 	for (int i = porte2; i < cutmax; ++i) {
-// 		amp = std::pow(std::cos((i - porte2) * cosm), 2.0);
-// 		angle = std::atan2(fdata[i][1], fdata[i][0]);
-// 		fdata[i][0] = amp * std::cos(angle);
-// 		fdata[i][1] = amp * std::sin(angle);
-// 	}
-	
-// 	for (int i = cutmax; i < nfreq; ++i) {
-// 		fdata[i][0] = 0.0;
-// 		fdata[i][1] = 0.0;
-// 	}
-// }
-
-
-// template <typename T, typename F>
-// void map_signals(T* data, int nsig, int npts, F* func){
-// 	for (int i = 0; i < nsig; i++){
-// 		(*func)(data + (i * npts), npts);
-// 	}
-// }
-
-
-// template <typename T, typename F>
-// void apply_to_signals(Array2D<T>& arr, F* func, uint32_t nthreads)
-// {	
-// 	uint32_t nsig = arr.nrow_;	
-// 	uint32_t npts = arr.ncol_;	
-// 	if (nthreads <= 1) {map_signals(arr.data_, nsig, npts, func);}
-
-// 	else {
-// 		std::vector<std::thread> pool;
-// 		int start, end, nsig_chunk;
-// 		T* dstart = nullptr;
-
-// 		for (int i = 0; i < nthreads; i++){
-
-// 			start = floor(i * nsig / nthreads);
-// 			end = floor((i + 1) * nsig / nthreads);
-// 			dstart = arr.data_ + (start * npts);
-// 			nsig_chunk = end - start;
-// 			// printf("%d %d\n", start, end);
-// 			pool.push_back(std::thread(&map_signals<T, F>, dstart, nsig_chunk, npts, func));
-// 		}
-
-// 		for(auto& thread : pool) thread.join();
-// 	}
-// }
-
-
-
-// template <typename T1, typename T2>
-// void map_signals_parallel(T1* data, int nsig, int npts, T2* func, int nthreads)
-// {
-// 	if (nthreads <= 1) {map_signals(data, nsig, npts, func);}
-
-// 	else {
-// 		std::vector<std::thread> pool;
-// 		int start, end, nsig_chunk;
-// 		T1* dstart = nullptr;
-
-// 		for (int i = 0; i < nthreads; i++){
-
-// 			start = floor(i * nsig / nthreads);
-// 			end = floor((i + 1) * nsig / nthreads);
-// 			dstart = data + (start * npts);
-// 			nsig_chunk = end - start;
-// 			// printf("%d %d\n", start, end);
-// 			pool.push_back(std::thread(&map_signals<T1, T2>, dstart, nsig_chunk, npts, func));
-// 		}
-
-// 		for(auto& thread : pool) thread.join();
-// 	}
-// }
-
-
-
-// template <typename T1, typename T2>
-// void map_signals_pool(T1* data, int nsig, int npts, T2* func, std::vector<std::thread> pool)
-// {
-
-// 	int start, end, nsig_chunk;
-// 	T1* dstart = nullptr;
-// 	uint int nthreads = pool.size();
-
-// 	for (int i = 0; i < nthreads; i++){
-// 	// for(std::vector<int>::uint32_type i = 0; i < pool.size(); i++) {
-
-// 		start = floor(i * nsig / nthreads);
-// 		end = floor((i + 1) * nsig / nthreads);
-// 		dstart = data + (start * npts);
-// 		nsig_chunk = end - start;
-// 		// printf("%d %d\n", start, end);
-// 		pool.push_back(std::thread(&map_signals<T1, T2>, dstart, nsig_chunk, npts, func));
-// 	}
-
-// 	for(auto& thread : pool) thread.join();
-
-// }
-
-// void WhitenSpectrum(float (*fdata)[2], int nfreq, float fsr, float fmin, float fmax, int len_taper)
-
-
-// float energy_freq_domain(float (*sig)[2], int nfreq)
-// {
-// 	float energy = 0;
-
-// 	for (int i = 0; i < nfreq; ++i) {
-// 		energy += sig[i][0] * sig[i][0] + sig[i][1] * sig[i][1];
-// 	}
-// 	// multiply by 2 for symmetry
-// 	return energy * 2;
-// }
-
+// Cross-correlate complex signals, cc(f) = s1(f) x s2*(f)
+#pragma omp declare simd aligned(sig1, sig2:MEM_ALIGNMENT)
+float XCorrEnergy(fftwf_complex const *sig1, fftwf_complex const *sig2, uint32_t const nfreq)
+{
+	float a, b;
+	float sum = 0;
+	#pragma omp simd aligned(sig1, sig2:MEM_ALIGNMENT)
+	for (uint32_t i = 0; i < nfreq; ++i){
+		a = (sig1[i][0] * sig2[i][0]) + (sig1[i][1] * sig2[i][1]);
+		b = (sig1[i][0] * sig2[i][1]) - (sig1[i][1] * sig2[i][0]);
+		sum += (a * a) + (b * b);
+
+		// a = sig1[i][0] * sig2[i][0] + sig1[i][1] * sig2[i][1];
+		// b = sig1[i][0] * sig2[i][1] - sig1[i][1] * sig2[i][0];
+		// sum += (sig1[i][0] * sig2[i][0] + sig1[i][1] * sig2[i][1]) * (sig1[i][0] * sig2[i][0] + sig1[i][1] * sig2[i][1]) + (sig1[i][0] * sig2[i][1] - sig1[i][1] * sig2[i][0]) * (sig1[i][0] * sig2[i][1] - sig1[i][1] * sig2[i][0]);
+	}
+
+	return sum;
+}
 
 
 }

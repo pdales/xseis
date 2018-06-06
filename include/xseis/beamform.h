@@ -42,8 +42,8 @@ Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2
 			cc_ptr = data_cc.row(i);
 
 			// Migrate single ccf on to grid based on tt difference
-			#pragma omp simd \
-			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+			// #pragma omp simd \
+			// aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
 			for (size_t j = 0; j < ngrid; ++j) {
 				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
 
@@ -64,6 +64,19 @@ Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2
 
 void InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, Vector<float>& output, float scale_pwr=100)
 {
+
+	// assert(output.data_ * sizeof(float) % CACHE_LINE == 0);
+	assert((uintptr_t) output.data_ % MEM_ALIGNMENT == 0);
+	assert((uintptr_t) data_cc.row(1) % MEM_ALIGNMENT == 0);
+	assert((uintptr_t) ttable.row(10) % MEM_ALIGNMENT == 0);
+
+	// assert((uintptr_t) &data_cc[1] % MEM_ALIGNMENT == 0);
+
+
+	// assert_aligned(output.data_);
+	// assert_aligned(ttable.row(1));
+	// assert_aligned(data_cc.row(1));
+
 	const size_t hlen = data_cc.ncol_ / 2;	
 	const size_t ngrid = ttable.ncol_;
 
@@ -75,15 +88,14 @@ void InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vecto
 	size_t ix;
 
 	for(size_t i = 0; i < ix_patch.size(); ++i) {
-		ix = ix_patch[i];
-		
+
+		ix = ix_patch[i];		
 		tts_sta1 = ttable.row(ckeys(ix, 0));
 		tts_sta2 = ttable.row(ckeys(ix, 1));
 		cc_ptr = data_cc.row(ix);
 
 		// Migrate single ccf on to grid based on tt difference
-		#pragma omp simd \
-		aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+		#pragma omp simd aligned(out_ptr, cc_ptr, tts_sta1, tts_sta2: MEM_ALIGNMENT)
 		for (size_t j = 0; j < ngrid; ++j) {
 			out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
 		}
@@ -158,6 +170,11 @@ void InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<u
 	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
 	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
 
+	assert((uintptr_t) data_cc.row(1) % MEM_ALIGNMENT == 0);
+	assert((uintptr_t) ttable.row(1) % MEM_ALIGNMENT == 0);
+	assert((uintptr_t) output.data_ % MEM_ALIGNMENT == 0);
+	
+
 	// const size_t cclen = data_cc.ncol_;
 	const size_t hlen = data_cc.ncol_ / 2;	
 	const size_t ncc = data_cc.nrow_;
@@ -187,8 +204,8 @@ void InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<u
 			cc_ptr = data_cc.row(i);
 
 			// Migrate single ccf on to grid based on tt difference
-			#pragma omp simd \
-			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+			// #pragma omp simd aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+			#pragma omp simd aligned(out_ptr, cc_ptr: CACHE_LINE)
 			for (size_t j = 0; j < blocklen; ++j) {
 				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
 			}
@@ -240,7 +257,7 @@ Vector<float> InterLocBlocksPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ck
 			cc_ptr = data_cc.row(i);
 
 			// Migrate single ccf on to grid based on tt difference
-			#pragma omp simd \
+			// #pragma omp simd \
 			aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
 			for (size_t j = 0; j < blocklen; ++j) {
 				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
@@ -321,78 +338,78 @@ void NaiveSearch(Array2D<float>& data, Array2D<uint16_t>& ttable, size_t tmin, s
 }
 
 
-// Delay and summing raw waveforms for all gridlocs for all possible starttimes
-//  requires transposed ttable
-void MFPSum(Array2D<float>& data, Array2D<uint16_t>& ttable, uint32_t wlen, std::vector<size_t> otimes, fftwf_plan& plan_fwd, Vector<float>& wpower, Vector<size_t>& wlocs)
-{
+// // Delay and summing raw waveforms for all gridlocs for all possible starttimes
+// //  requires transposed ttable
+// void MFPSum(Array2D<float>& data, Array2D<uint16_t>& ttable, uint32_t wlen, std::vector<size_t> otimes, fftwf_plan& plan_fwd, Vector<float>& wpower, Vector<size_t>& wlocs)
+// {
 
-	// std::cout << data.nrow_ << '\n';
-	// std::cout << ttable.ncol_ << '\n';
-	size_t nt = otimes.size();
-	size_t nsig = data.nrow_;
-	size_t ngrid = ttable.nrow_;
+// 	// std::cout << data.nrow_ << '\n';
+// 	// std::cout << ttable.ncol_ << '\n';
+// 	size_t nt = otimes.size();
+// 	size_t nsig = data.nrow_;
+// 	size_t ngrid = ttable.nrow_;
 
-	uint32_t hlen = wlen / 2;
+// 	uint32_t hlen = wlen / 2;
 
-	// auto tt_ixs = Vector<size_t>(nsig);	
-	auto tmp_stack = Vector<float>(nt);
+// 	// auto tt_ixs = Vector<size_t>(nsig);	
+// 	auto tmp_stack = Vector<float>(nt);
 
-	process::Fill(wpower, 0);
-	float* best_vals = wpower.data_;
-	size_t* best_locs = wlocs.data_;
+// 	process::Fill(wpower, 0);
+// 	float* best_vals = wpower.data_;
+// 	size_t* best_locs = wlocs.data_;
 
-	// size_t nfreq = wlen / 2 + 1;
-	// auto fstack = Vector<fftwf_complex>(nfreq);
-	// // auto fsig = Vector<fftwf_complex>(nfreq);
-	// // auto fptr = fsig.data_;
-	// auto fptr = fftwf_alloc_complex(nfreq);
+// 	// size_t nfreq = wlen / 2 + 1;
+// 	// auto fstack = Vector<fftwf_complex>(nfreq);
+// 	// // auto fsig = Vector<fftwf_complex>(nfreq);
+// 	// // auto fptr = fsig.data_;
+// 	// auto fptr = fftwf_alloc_complex(nfreq);
 
-	auto fstack = Vector<float>(nfreq);
+// 	auto fstack = Vector<float>(nfreq);
 
-	// printf("Searching grid points: %lu to %lu\n", gix_start, gix_end);
+// 	// printf("Searching grid points: %lu to %lu\n", gix_start, gix_end);
 
-	std::cout << "nt: " << nt << '\n';
-	std::cout << "ngrid: " << ngrid << '\n';
-	std::cout << "nsig: " << nsig << '\n';
+// 	std::cout << "nt: " << nt << '\n';
+// 	std::cout << "ngrid: " << ngrid << '\n';
+// 	std::cout << "nsig: " << nsig << '\n';
 
-	for (size_t ipt = 0; ipt < ngrid; ++ipt)
-	{	
-		tmp_stack.fill(0);
-		uint16_t *tt_ixs = ttable.row(ipt);
+// 	for (size_t ipt = 0; ipt < ngrid; ++ipt)
+// 	{	
+// 		tmp_stack.fill(0);
+// 		uint16_t *tt_ixs = ttable.row(ipt);
 
-		if (ipt % 1000 == 0) {
-			printf("Progress: %.2f \n", ((float)(ipt) / (ngrid) * 100));
-		}
+// 		if (ipt % 1000 == 0) {
+// 			printf("Progress: %.2f \n", ((float)(ipt) / (ngrid) * 100));
+// 		}
 
-		for (size_t i = 0; i < nt; ++i) 
-		{
-			size_t ot = otimes[i];
-			process::Fill(fstack, 0);
-			printf("Ot: %lu \n", ot);			
+// 		for (size_t i = 0; i < nt; ++i) 
+// 		{
+// 			size_t ot = otimes[i];
+// 			process::Fill(fstack, 0);
+// 			printf("Ot: %lu \n", ot);			
 		
-			for (size_t j = 0; j < nsig; ++j) 
-			{
-				// std::cout << "j: " << j << '\n';
-				// float *dptr = data.row(j) + ot + tt_ixs[j] - hlen;
-				float *dptr = data.row(j) + tt_ixs[j];
-				fftwf_execute_dft_r2c(plan_fwd, dptr, fptr);
-				std::cout << "descrip: " << ot + tt_ixs[j] - hlen << '\n';
-				process::Accumulate(fptr, fstack.data_, nfreq);
-			}
+// 			for (size_t j = 0; j < nsig; ++j) 
+// 			{
+// 				// std::cout << "j: " << j << '\n';
+// 				// float *dptr = data.row(j) + ot + tt_ixs[j] - hlen;
+// 				float *dptr = data.row(j) + tt_ixs[j];
+// 				fftwf_execute_dft_r2c(plan_fwd, dptr, fptr);
+// 				std::cout << "descrip: " << ot + tt_ixs[j] - hlen << '\n';
+// 				process::Accumulate(fptr, fstack.data_, nfreq);
+// 			}
 
-			tmp_stack[i] = process::Energy(fstack.data_, nfreq);
-		}
+// 			tmp_stack[i] = process::Energy(fstack.data_, nfreq);
+// 		}
 
-		// #pragma omp simd aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
-		for (size_t j = 0; j < nt; ++j) 
-		{
-			if (std::abs(tmp_stack[j]) > std::abs(best_vals[j])) {
-				best_vals[j] = tmp_stack[j];
-				best_locs[j] = ipt;
-			}
-		}	
-	}
-}
+// 		// #pragma omp simd aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+// 		for (size_t j = 0; j < nt; ++j) 
+// 		{
+// 			if (std::abs(tmp_stack[j]) > std::abs(best_vals[j])) {
+// 				best_vals[j] = tmp_stack[j];
+// 				best_locs[j] = ipt;
+// 			}
+// 		}	
+// 	}
+// }
 
 
 // Uses constant velocity medium, introduce random errors

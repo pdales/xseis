@@ -44,8 +44,7 @@ struct Dataset {
 
 	template <typename T>	
 	void LoadChunk(Array2D<T> &arr, hsize_t offset[2]) {
-		// Loads hyperslab with arr dimensions at specified offset
-
+		// Loads hyperslab with arr dimensions at specified offset		
 		// Define slab size
 		hsize_t count[2] = {arr.nrow_, arr.ncol_};
 		filespace_.selectHyperslab(H5S_SELECT_SET, count, offset);
