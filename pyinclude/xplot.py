@@ -10,6 +10,8 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import os
 from scipy import fftpack
+from scipy.fftpack import fft, ifft, rfft, fftfreq
+import xutil
 
 from matplotlib.pyplot import rcParams
 rcParams['figure.figsize'] = 11, 8
@@ -68,6 +70,8 @@ def stations(locs, ckeys=None, vals=None, alpha=0.3, lstep=100, pkeys=None, ploc
 		for i in range(x.size):
 			plt.text(x[i], y[i], i, color='green')
 
+	plt.xlabel('x (m)')
+	plt.ylabel('y (m)')
 	plt.axis('equal')
 	plt.show()
 
@@ -157,6 +161,30 @@ def freq(sig, sr, xlim=None):
 	plt.show()
 
 
+def angle(sig, sr, xlim=None):
+
+	plt.subplot(211)
+	plt.plot(sig)
+	plt.xlabel('Time')
+	plt.subplot(212)
+
+	size = len(sig)
+	hl = size // 2
+	freq = fftpack.fftfreq(size, d=1. / sr)[:hl]
+	f = fftpack.fft(sig)[:hl]
+	plt.plot(freq, np.abs(f))
+
+	ang = np.angle(f)
+	plt.plot(freq, ang)
+	if xlim is not None:
+		plt.xlim(xlim)
+	else:
+		plt.xlim([0, sr / 2.])
+		
+	plt.xlabel('Freq (Hz)')
+	plt.show()
+
+
 def sigs_old(d, spacing=10, labels=None, vlines=None):
 
 	if vlines is not None:
@@ -234,3 +262,43 @@ def set_axes_equal(ax):
 	ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
 	ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
 	ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
+
+
+def plot3d(locs):
+
+	fig = plt.figure(figsize=(8, 7), facecolor='white')
+	ax = fig.add_subplot(111, projection='3d')
+	x, y, z = locs.T
+	ax.scatter(x, y, z, c='red')
+	ax.set_xlabel('X (m)')
+	ax.set_ylabel('Y (m)')
+	ax.set_zlabel('Z (m)')
+
+
+def spectro(sig, wl, sr, stepsize=None, norm=False):
+
+	if stepsize is None:
+		stepsize = wl // 2
+
+	npts = len(sig)
+	slices = xutil.build_slice_inds(0, npts, wl, stepsize=stepsize)
+	nsl = len(slices)
+	df = np.zeros((nsl, wl), dtype=np.complex)
+
+	for i, sl in enumerate(slices):
+		df[i] = fft(sig[sl[0]:sl[1]])
+
+	plt.subplot(212)
+	plt.plot(sig)
+	plt.xlim([0, npts])
+	plt.subplot(211)
+	freqs = fftfreq(wl, d=1. / sr)
+	# plt.imshow(np.abs(df), aspect='auto', extent=extent, origin='lower', interpolation='none')
+	fsr = wl / sr
+	imd = np.abs(df[:, : wl // 3]).T
+	extent = [0, df.shape[0], freqs[0], (wl // 3) / fsr]
+
+	if norm:
+		imd /= np.max(imd, axis=0)
+	plt.imshow(imd, aspect='auto', origin='lower', interpolation='none', extent=extent)
+

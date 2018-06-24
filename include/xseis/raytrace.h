@@ -29,7 +29,7 @@ Array2D<uint16_t> TTableFromVisc1D(Array2D<float>& stalocs, Array2D<float>& grid
 	// consts used to make grids
 	const size_t ndim = 2;
 	const size_t npad = 2;	
-	const float zshift = 500;
+	// const float zshift = 500;
 	const float xseed = 100;
 
 	const auto shape = agsis::vect<size_t, ndim>(viscosity.ncol_, viscosity.nrow_);
@@ -64,7 +64,7 @@ Array2D<uint16_t> TTableFromVisc1D(Array2D<float>& stalocs, Array2D<float>& grid
 		ttablerow = ttable.row(i);
 		sl = stalocs.row(i);
 
-		zseed = sl[2] + zshift;
+		zseed = sl[2];
 		seed[0] = static_cast<int>(zseed / visc_spacing + npad + 0.5);
 		seed[1] = static_cast<int>(xseed / visc_spacing + npad + 0.5);
 
@@ -82,7 +82,7 @@ Array2D<uint16_t> TTableFromVisc1D(Array2D<float>& stalocs, Array2D<float>& grid
 			gl = gridlocs.row(j);
 			dxy = process::DistCartesian2D(gl, sl);
 			xdest = static_cast<size_t>((xseed + dxy) / visc_spacing + npad + 0.5);
-			zdest = static_cast<size_t>((gl[2] + zshift) / visc_spacing + npad + 0.5);
+			zdest = static_cast<size_t>(gl[2] / visc_spacing + npad + 0.5);
 
 			assert(xdest < tgrid.ncol_);
 			assert(zdest < tgrid.nrow_);

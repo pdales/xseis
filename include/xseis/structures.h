@@ -1,7 +1,5 @@
 /*
-Some thin wrappers around data, mainly so I dont have to pass
-nsig, npts to every function. Should probably use some existing
-ndim array library.
+Data structures
 */
 
 
@@ -393,22 +391,35 @@ public:
 	// (dx, dy, dz)
 	float spacing;
 
-
 	float xmin, ymin, zmin;
-	float x, y, z;
+	
 	// float zmax = lims[5];
 	size_t nx, ny, nz;
-	size_t ix, iy, iz;
+	float dx, dy, dz;
 	size_t npts;
 	size_t size;
+
+	float x, y, z;
+	size_t ix, iy, iz;
+
 	// size_t size = 0;
 
 	Grid() {}
 	Grid(std::vector<float> lims):
 	lims(lims), spacing(lims[6]), xmin(lims[0]), ymin(lims[2]), zmin(lims[4]){
-		nx = (lims[1] - lims[0]) / spacing;
-		ny = (lims[3] - lims[2]) / spacing;
-		nz = (lims[5] - lims[4]) / spacing;
+
+		float xrange = lims[1] - lims[0];
+		float yrange = lims[3] - lims[2];
+		float zrange = lims[5] - lims[4];
+
+		nx = std::abs(xrange) / spacing;
+		ny = std::abs(yrange) / spacing;
+		nz = std::abs(zrange) / spacing;
+
+		dx = ((xrange > 0) - (xrange < 0)) * spacing;
+		dy = ((yrange > 0) - (yrange < 0)) * spacing;
+		dz = ((zrange > 0) - (zrange < 0)) * spacing;
+
 		npts = (size_t) nx * ny * nz;
 		size = npts * 3;
 		printf("Grid (%lu x %lu x %lu) = %lu\n", nx, ny, nz, npts);
@@ -424,9 +435,9 @@ public:
 		for (size_t i = 0; i < nz; ++i) {
 			for (size_t j = 0; j < ny; ++j) {
 				for (size_t k = 0; k < nx; ++k) {					
-					row_ix[0] = xmin + k * spacing;
-					row_ix[1] = ymin + j * spacing;
-					row_ix[2] = zmin + i * spacing;
+					row_ix[0] = xmin + k * dx;
+					row_ix[1] = ymin + j * dy;
+					row_ix[2] = zmin + i * dz;
 					row_ix += 3;
 				}			
 			}
@@ -434,32 +445,109 @@ public:
 		return points;
 	}
 
-	size_t get_index(float *point){
+	// size_t get_index(float *point){
 		
-		x = point[0];
-		y = point[1];
-		z = point[2];
-		ix = (x - xmin) / spacing;
-		iy = (y - ymin) / spacing;
-		iz = (z - zmin) / spacing;
-		return (iz * nx * ny) + (iy * nx) + ix;
-	}
+	// 	x = point[0];
+	// 	y = point[1];
+	// 	z = point[2];
+	// 	ix = (x - xmin) / spacing;
+	// 	iy = (y - ymin) / spacing;
+	// 	iz = (z - zmin) / spacing;
+	// 	return (iz * nx * ny) + (iy * nx) + ix;
+	// }
 
-	void get_point(size_t index, float *buf){
+	// void get_point(size_t index, float *buf){
 				
-		ix = index % nx;
-		iy = ((index - ix) / nx) % ny;
-		iz = index / (nx * ny);
+	// 	ix = index % nx;
+	// 	iy = ((index - ix) / nx) % ny;
+	// 	iz = index / (nx * ny);
 
-		x = ix * spacing + xmin;
-		y = iy * spacing + ymin;
-		z = iz * spacing + zmin;
-		buf[0] = x;
-		buf[1] = y;
-		buf[2] = z;
-	}
+	// 	x = ix * spacing + xmin;
+	// 	y = iy * spacing + ymin;
+	// 	z = iz * spacing + zmin;
+	// 	buf[0] = x;
+	// 	buf[1] = y;
+	// 	buf[2] = z;
+	// }
 	
 };
+
+
+
+
+// class Grid {
+// public:
+// 	// e.g (xmin, xmax, ymin, ymax, zmin, zmax, spacing)
+// 	std::vector<float> lims;
+// 	// (dx, dy, dz)
+// 	float spacing;
+
+// 	float xmin, ymin, zmin;
+// 	float x, y, z;
+// 	// float zmax = lims[5];
+// 	size_t nx, ny, nz;
+// 	size_t ix, iy, iz;
+// 	size_t npts;
+// 	size_t size;
+// 	// size_t size = 0;
+
+// 	Grid() {}
+// 	Grid(std::vector<float> lims):
+// 	lims(lims), spacing(lims[6]), xmin(lims[0]), ymin(lims[2]), zmin(lims[4]){
+// 		nx = (lims[1] - lims[0]) / spacing;
+// 		ny = (lims[3] - lims[2]) / spacing;
+// 		nz = (lims[5] - lims[4]) / spacing;
+// 		npts = (size_t) nx * ny * nz;
+// 		size = npts * 3;
+// 		printf("Grid (%lu x %lu x %lu) = %lu\n", nx, ny, nz, npts);
+// 	}
+// 	~Grid(){}
+
+
+// 	Array2D<float> build_points(){
+
+// 		auto points = Array2D<float>(npts, 3);
+// 		float* row_ix = points.data_;
+		
+// 		for (size_t i = 0; i < nz; ++i) {
+// 			for (size_t j = 0; j < ny; ++j) {
+// 				for (size_t k = 0; k < nx; ++k) {					
+// 					row_ix[0] = xmin + k * spacing;
+// 					row_ix[1] = ymin + j * spacing;
+// 					row_ix[2] = zmin + i * spacing;
+// 					row_ix += 3;
+// 				}			
+// 			}
+// 		}
+// 		return points;
+// 	}
+
+// 	size_t get_index(float *point){
+		
+// 		x = point[0];
+// 		y = point[1];
+// 		z = point[2];
+// 		ix = (x - xmin) / spacing;
+// 		iy = (y - ymin) / spacing;
+// 		iz = (z - zmin) / spacing;
+// 		return (iz * nx * ny) + (iy * nx) + ix;
+// 	}
+
+// 	void get_point(size_t index, float *buf){
+				
+// 		ix = index % nx;
+// 		iy = ((index - ix) / nx) % ny;
+// 		iz = index / (nx * ny);
+
+// 		x = ix * spacing + xmin;
+// 		y = iy * spacing + ymin;
+// 		z = iz * spacing + zmin;
+// 		buf[0] = x;
+// 		buf[1] = y;
+// 		buf[2] = z;
+// 	}
+	
+// };
 
 
 

@@ -26,7 +26,11 @@ size_t PadToBytes(const size_t size, const uint32_t nbytes=CACHE_LINE)
 std::vector<size_t> WinsAlignedF32(size_t npts, size_t wlen, float overlap) 
 {
 	std::vector<size_t> wix;
-	size_t dx = PadToBytes<float>((1 - overlap) * wlen);
+
+	float dxf = (1 - overlap) * wlen;
+	assert(dxf > 1);
+
+	size_t dx = PadToBytes<float>(dxf);
 
 	std::cout << "actual_overlap: " <<  1.0 - (float) dx / wlen << "%\n";
 	size_t ix = 0;
@@ -36,6 +40,7 @@ std::vector<size_t> WinsAlignedF32(size_t npts, size_t wlen, float overlap)
 	}
 	return wix;				
 }
+
 
 std::vector<size_t> OverlappingWindows(size_t npts, size_t wlen, float overlap) 
 {
@@ -133,12 +138,11 @@ void CopyArrayData(Array2D<T>& a, Array2D<T>& b) {
 }
 
 
-
 template<typename T>
 void FillRandInt(Vector<T>& d, T min, T max)
 {
 	std::mt19937::result_type seed = time(0);
-	auto rand = std::bind(std::uniform_int_distribution<T>(min, max), std::mt19937(seed));
+	auto rand = std::bind(std::uniform_int_distribution<T>(min, max - 1), std::mt19937(seed));
 	for(size_t i = 0; i < d.size_; ++i) {
 		d[i] = rand();
 	}
@@ -356,27 +360,27 @@ void AppendToFile(std::string fname, std::vector<T> vec){
 }
 
 
-void write_xyz_win(std::string fname, Array2D<uint32_t>& arr, Grid& grid){
-	// std::cout.precision(10);
-	std::ofstream myfile (fname);
+// void write_xyz_win(std::string fname, Array2D<uint32_t>& arr, Grid& grid){
+// 	// std::cout.precision(10);
+// 	std::ofstream myfile (fname);
 
-	float loc[3];
-	// auto locwin = Array2D<float>(win_loc.size_, 3);
+// 	float loc[3];
+// 	// auto locwin = Array2D<float>(win_loc.size_, 3);
 
-	for (int i = 0; i < arr.nrow_; ++i) {	
-		for (int j = 0; j < arr.ncol_; ++j) {
-			grid.get_point(arr(i, j), loc);
+// 	for (int i = 0; i < arr.nrow_; ++i) {	
+// 		for (int j = 0; j < arr.ncol_; ++j) {
+// 			grid.get_point(arr(i, j), loc);
 
-			for (int k = 0; k < 3; ++k)
-			{
-				myfile << loc[k] << " ";
-			}
-		}
-		myfile << "\n";
-	}
-	myfile.close();	
+// 			for (int k = 0; k < 3; ++k)
+// 			{
+// 				myfile << loc[k] << " ";
+// 			}
+// 		}
+// 		myfile << "\n";
+// 	}
+// 	myfile.close();	
 
-}
+// }
 
 
 template <typename T>

@@ -17,6 +17,23 @@ import math
 from scipy.fftpack import fft, ifft, rfft, fftfreq
 
 
+def randomize_band(fsig, band, sr):
+
+	fnew = fsig.copy()
+	freqmin, freqmax = band
+	samples = len(fnew)
+	freqs = np.abs(fftfreq(samples, 1. / sr))
+	idx = np.where(np.logical_and(freqs >= freqmin, freqs <= freqmax))[0]
+
+	part = fnew[idx]
+	amps = np.abs(part)
+	rand = np.random.uniform(-np.pi, np.pi, len(part))
+	angs = np.exp(1j * rand)
+	fnew[idx] = amps * angs
+
+	return fnew
+
+
 def roll_data(data, tts):
 	droll = np.zeros_like(data)
 
@@ -26,16 +43,12 @@ def roll_data(data, tts):
 
 
 def comb_channels(data, cmap):
-
-	# groups = []
-	# for grp in np.unique(cmap):
-	# 	groups.append(np.where(cmap == grp)[0])
-
+	
 	groups = [np.where(sk == cmap)[0] for sk in np.unique(cmap)]
 	dstack = np.zeros((len(groups), data.shape[1]))
 
 	for i, grp in enumerate(groups):
-		dstack[i] = np.sum(np.abs(data[grp]), axis=0)
+		dstack[i] = np.mean(np.abs(data[grp]), axis=0)
 
 	return dstack
 
@@ -44,7 +57,7 @@ def mlab_coords(locs, lims, spacing):
 	return (locs - lims[:, 0]).T / spacing
 
 
-def SearchClusters(data, dmin):
+def SearchClusters(data, dmin, zmin=0):
 
 	inds = np.arange(data.shape[1])
 
@@ -55,6 +68,9 @@ def SearchClusters(data, dmin):
 		lmax = data[:-1, ix, 1:]
 		tmp = []
 		for k, centroid in enumerate(lmax):
+			if centroid[2] < zmin:
+				tmp.append(0)
+				continue
 			diff = np.linalg.norm(lmax - centroid, axis=-1)
 			tmp.append(np.where(diff < dmin)[0].size)
 
@@ -68,6 +84,22 @@ def SearchClusters(data, dmin):
 	return vals, slocs
 
 
+def MeanDist(data):
+
+	inds = np.arange(data.shape[1])
+	vals = []
+	for j, ix in enumerate(inds):
+		print(j)
+		lmax = data[:, ix, 1:]
+		x, y, z = lmax.T
+		err = np.std(x) + np.std(y) + np.std(z)
+		vals.append(err)
+
+	vals = np.array(vals) / 3
+
+	return vals
+
+
 def shift_locs(locs, unshift=False, vals=np.array([1.79236297e+05, 7.09943400e+06, 2.49199997e+02])):
 	vals = np.array(vals)
 	locs[:, 2] *= -1
@@ -77,12 +109,24 @@ def shift_locs(locs, unshift=False, vals=np.array([1.79236297e+05, 7.09943400e+0
 		return locs - vals
 
 
-def shift_locs_ot(locs, unshift=False, vals=np.array([650000., 4766000., 0])):
+def shift_locs_ot(locs, unshift=False, vals=np.array([650000., 4766000., 0]), zdepth=1200.):
 	vals = np.array(vals)
+	lnew = locs.copy()
+
 	if unshift is True:
-		return locs + vals
+		# lnew[:, 2] *= -1
+		lnew.T[2] = (lnew.T[2] - zdepth) * -1
+		return lnew + vals
 	else:
-		return locs - vals
+		lnew.T[2] = zdepth - lnew.T[2]
+		return lnew - vals
+
+# def shift_locs_ot(locs, unshift=False, vals=np.array([650000., 4766000., 0])):
+# 	vals = np.array(vals)
+# 	if unshift is True:
+# 		return locs + vals
+# 	else:
+# 		return locs - vals
 
 
 def normVec(v):
@@ -95,6 +139,10 @@ def norm(v):
 
 def angle_between_vecs(v1, v2):
 	return math.acos(np.dot(v1, v2) / (norm(v1) * norm(v2)))
+
+
+def dist(l1, l2):
+	return norm(l1 - l2)
 
 
 def dist_between(l1, l2):
@@ -266,8 +314,28 @@ def cross_corr(sig1, sig2, norm=True, pad=False, phase_only=False, phat=False):
 	return np.roll(cc, len(cc) // 2)
 
 
+def xcorr_freq(sig1f, sig2f):
+	"""Cross-correlate two signals."""
+	
+	ccf = np.conj(sig1f) * sig2f
+
+	if phat:
+		ccf = ccf / np.abs(ccf)
+
+	cc = np.real(ifft(ccf))
+
+	if norm:
+		cc /= np.sqrt(energy(sig1) * energy(sig2))
+
+	return np.roll(cc, len(cc) // 2)
+
+
 def energy(sig, axis=None):
 	return np.sum(sig ** 2, axis=axis)
+
+
+def energy_freq(fsig, axis=None):
+	return np.sum(np.abs(fsig) ** 2, axis=axis) / fsig.shape[-1]
 
 
 def build_slice_inds(start, stop, wlen, stepsize=None):
@@ -280,3 +348,72 @@ def build_slice_inds(start, stop, wlen, stepsize=None):
 	imax = np.arange(start + wlen, stop + stepsize - 1, stepsize)
 
 	return np.dstack((imin, imax))[0]
+
+
+def freq_window(cf, npts, sr):
+	nfreq = int(npts // 2 + 1)
+	fsr = npts / sr
+	cf = np.array(cf)
+	cx = (cf * fsr + 0.5).astype(int)
+
+	win = np.zeros(nfreq, dtype=np.float32)
+	win[:cx[0]] = 0
+	win[cx[0]:cx[1]] = taper_cosine(cx[1] - cx[0])
+	win[cx[1]:cx[2]] = 1
+	win[cx[2]:cx[3]] = taper_cosine(cx[3] - cx[2])[::-1]
+	win[cx[-1]:] = 0
+	return win
+
+
+def taper_cosine(wlen):
+	return np.cos(np.linspace(np.pi / 2., np.pi, wlen)) ** 2
+
+
+def phase(sig):
+	return np.exp(1j * np.angle(sig))
+
+
+def whiten(sig, win):
+	"""Whiten signal, modified from MSNoise."""
+	npts = len(sig)
+	nfreq = int(npts // 2 + 1)
+
+	assert(len(win) == nfreq)
+	# fsr = npts / sr
+
+	fsig = fft(sig)
+	# hl = nfreq // 2
+
+	half = fsig[: nfreq]
+	half = win * phase(half)
+	fsig[: nfreq] = half
+	fsig[-nfreq + 1:] = half[1:].conjugate()[::-1]
+
+	return np.real(ifft(fsig))
+
+
+def whiten_freq(fsig, win):
+	# npts = len(fsig)
+	# nfreq = int(npts // 2 + 1)
+	nfreq = int(len(fsig) // 2 + 1)
+	assert(len(win) == nfreq)
+	fsig[: nfreq] = win * phase(fsig[: nfreq])
+	fsig[-nfreq + 1:] = fsig[1: nfreq].conjugate()[::-1]
+
+
+def mirror_freqs(data):
+	nfreq = int(data.shape[1] // 2 + 1)
+	data[:, -nfreq + 1:] = np.fliplr(data[:, 1: nfreq].conjugate())
+
+
+def taper_data(data, wlen):
+	tap = taper_cosine(wlen)
+	data[:wlen] *= tap
+	data[-wlen:] *= tap[::-1]
+
+
+def taper2d(data, wlen):
+	tap = taper_cosine(wlen)
+	for i in range(data.shape[0]):
+		data[i][:wlen] *= tap
+		data[i][-wlen:] *= tap[::-1]

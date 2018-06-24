@@ -100,12 +100,12 @@ uint mod_floor(int a, int n) {
 }
 
 
-Vector<fftwf_complex> BuildPhaseShiftVec(size_t const nfreq, long const nshift) {
+Vector<fftwf_complex> BuildPhaseShiftVec(size_t const nfreq, int const nshift) {
 	
 	auto v = Vector<fftwf_complex>(nfreq);
 	// std::vector<fftwf_complex> v(nfreq);
 	float const fstep = 0.5 / (nfreq - 1);
-	float const factor = -nshift * 2 * M_PI * fstep;
+	float const factor = nshift * 2 * M_PI * fstep;
 
 	for(size_t i = 0; i < nfreq; ++i) {
 		v[i][0] = std::cos(i * factor);
@@ -120,7 +120,7 @@ Vector<fftwf_complex> BuildPhaseShiftVec(size_t const nfreq, long const nshift) 
 // x + yi = s1[0] + s1[1]i
 // u + vi = s2[0] + s2[1]i
 #pragma omp declare simd aligned(sig1, sig2:MEM_ALIGNMENT)
-void Convolve(fftwf_complex* sig1, fftwf_complex* sig2, uint32_t const nfreq)
+void Convolve(fftwf_complex const* const sig2, fftwf_complex* const sig1, uint32_t const nfreq)
 {
 	float tmp;
 	#pragma omp simd aligned(sig1, sig2:MEM_ALIGNMENT)
@@ -130,6 +130,61 @@ void Convolve(fftwf_complex* sig1, fftwf_complex* sig2, uint32_t const nfreq)
 		sig1[i][0] = tmp;
 	}
 }
+
+#pragma omp declare simd aligned(sig1, sig2, out:MEM_ALIGNMENT)
+inline void Convolve(fftwf_complex const* const sig1, fftwf_complex const* const sig2,
+		   fftwf_complex* const out, uint32_t const nfreq)
+{
+	#pragma omp simd aligned(sig1, sig2, out:MEM_ALIGNMENT)
+	for (uint32_t i = 0; i < nfreq; ++i){
+		out[i][0] = sig1[i][0] * sig2[i][0] - sig1[i][1] * sig2[i][1];
+		out[i][1] = sig1[i][0] * sig2[i][1] + sig1[i][1] * sig2[i][0];
+	}
+}
+
+
+#pragma omp declare simd aligned(data, stack:MEM_ALIGNMENT)
+inline void Accumulate(fftwf_complex const* const data, fftwf_complex* const stack,
+						 uint32_t const npts)
+{		
+	#pragma omp simd aligned(data, stack:MEM_ALIGNMENT)
+	for(uint32_t i = 0; i < npts; ++i) {
+		stack[i][0] += data[i][0];
+		stack[i][1] += data[i][1];
+	}
+}
+
+#pragma omp declare simd aligned(sig:MEM_ALIGNMENT)
+void Whiten(fftwf_complex* const sig, uint32_t const npts)
+{		
+	#pragma omp simd aligned(sig:MEM_ALIGNMENT)
+	for(uint32_t i = 0; i < npts; ++i) {
+		float abs = std::sqrt(sig[i][0] * sig[i][0] + sig[i][1] * sig[i][1]);
+		sig[i][0] /= abs;
+		sig[i][1] /= abs;
+	}
+}
+
+#pragma omp declare simd aligned(sig, out:MEM_ALIGNMENT)
+void Absolute(fftwf_complex const* const sig, float* out, uint32_t const npts)
+{		
+	#pragma omp simd aligned(sig, out:MEM_ALIGNMENT)
+	for(uint32_t i = 0; i < npts; ++i) {
+		out[i] = std::sqrt(sig[i][0] * sig[i][0] + sig[i][1] * sig[i][1]);
+	}
+}
+
+// #pragma omp declare simd aligned(sig1, sig2:MEM_ALIGNMENT)
+// void Convolve(fftwf_complex* sig1, fftwf_complex* sig2, uint32_t const nfreq)
+// {
+// 	float tmp;
+// 	#pragma omp simd aligned(sig1, sig2:MEM_ALIGNMENT)
+// 	for (uint32_t i = 0; i < nfreq; ++i){
+// 		tmp = sig1[i][0] * sig2[i][0] - sig1[i][1] * sig2[i][1];
+// 		sig1[i][1] = sig1[i][0] * sig2[i][1] + sig1[i][1] * sig2[i][0];
+// 		sig1[i][0] = tmp;
+// 	}
+// }
 
 
 
@@ -144,6 +199,30 @@ void XCorr(fftwf_complex const* const sig1, fftwf_complex const* const sig2,
 		out[i][1] = sig1[i][0] * sig2[i][1] - sig1[i][1] * sig2[i][0];
 	}
 }
+
+#pragma omp declare simd aligned(sig1, sig2:MEM_ALIGNMENT)
+float DotProductEnergy(float const* const sig1, float const* const sig2, uint32_t const npts)
+{
+	float result = 0;
+	#pragma omp simd aligned(sig1, sig2:MEM_ALIGNMENT)
+	for (uint32_t i = 0; i < npts; ++i){
+		// result += sig1[0] * sig2[0];		
+		result += (sig1[0] * sig2[0]) * (sig1[0] * sig2[0]);		
+	}
+	return result;
+}
+
+#pragma omp declare simd aligned(sig1, sig2:MEM_ALIGNMENT)
+float DotProduct(float const* const sig1, float const* const sig2, uint32_t const npts)
+{
+	float result = 0;
+	#pragma omp simd aligned(sig1, sig2:MEM_ALIGNMENT)
+	for (uint32_t i = 0; i < npts; ++i){
+		result += sig1[0] * sig2[0];		
+	}
+	return result;
+}
+
 
 // // Cross-correlate signal pairs of fdata and output to fdata_cc
 // void XCorrPairs(Array2D<fftwf_complex>& fdata, Array2D<uint16_t>& ckeys, Array2D<fftwf_complex>& fdata_cc)
@@ -290,13 +369,6 @@ float rms_energy(float *sig, size_t npts)
 	return std::sqrt(square_sum / npts);
 }
 
-
-
-void multiply(float *sig, size_t npts, float factor){
-	for (size_t i = 0; i < npts; ++i){
-		sig[i] *= factor;
-	}
-}
 
 void clip(float *sig, size_t npts, float thresh){
 	for (size_t i = 0; i < npts; ++i){
@@ -498,9 +570,9 @@ float standard_deviation(T *data, size_t size) {
 		var += (data[i] - mean) * (data[i] - mean);
 	}
 
-	var /= size;
-	return std::sqrt(var);
+	return std::sqrt(var / size);
 }
+
 
 template<typename T>
 float mean(T *data, size_t size) {
@@ -564,6 +636,31 @@ void SlidingWinMax(float *sig, size_t npts, size_t wlen)
 
 }
 
+void Multiply(float *sig, size_t npts, float val){
+	for (size_t i = 0; i < npts; ++i){
+		sig[i] *= val;
+	}
+}
+
+
+void Multiply(fftwf_complex* data, size_t npts, float val)
+{		
+	for(size_t i = 0; i < npts; ++i) {
+		data[i][0] *= val;
+		data[i][1] *= val;
+	}
+}
+
+
+void Fill(fftwf_complex* data, size_t npts, float val)
+{		
+	for(size_t i = 0; i < npts; ++i) {
+		data[i][0] = val;
+		data[i][1] = val;
+	}
+}
+
+
 
 void Fill(Vector<fftwf_complex>& data, float val)
 {		
@@ -580,12 +677,18 @@ void Fill(Vector<float>& data, float val)
 	}
 }
 
+void Copy(fftwf_complex const *in, size_t npts, fftwf_complex *out)
+{		
+	std::copy(&(in)[0][0], &(in + npts)[0][0], &out[0][0]);
+}
 
-void Accumulate(fftwf_complex const *data, fftwf_complex *stack, size_t npts)
+
+
+void Subtract(fftwf_complex const *data, fftwf_complex *data_mod, size_t npts)
 {		
 	for(size_t i = 0; i < npts; ++i) {
-		stack[i][0] += data[i][0];
-		stack[i][1] += data[i][1];
+		data_mod[i][0] -= data[i][0];
+		data_mod[i][1] -= data[i][1];
 	}
 }
 

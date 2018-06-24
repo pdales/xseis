@@ -95,6 +95,7 @@ void InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vecto
 		cc_ptr = data_cc.row(ix);
 
 		// Migrate single ccf on to grid based on tt difference
+		// #pragma omp simd aligned(out_ptr, cc_ptr: MEM_ALIGNMENT)
 		#pragma omp simd aligned(out_ptr, cc_ptr, tts_sta1, tts_sta2: MEM_ALIGNMENT)
 		for (size_t j = 0; j < ngrid; ++j) {
 			out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
@@ -171,7 +172,7 @@ void InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<u
 	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
 
 	assert((uintptr_t) data_cc.row(1) % MEM_ALIGNMENT == 0);
-	assert((uintptr_t) ttable.row(1) % MEM_ALIGNMENT == 0);
+	// assert((uintptr_t) ttable.row(1) % MEM_ALIGNMENT == 0);
 	assert((uintptr_t) output.data_ % MEM_ALIGNMENT == 0);
 	
 
@@ -205,7 +206,7 @@ void InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<u
 
 			// Migrate single ccf on to grid based on tt difference
 			// #pragma omp simd aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
-			#pragma omp simd aligned(out_ptr, cc_ptr: CACHE_LINE)
+			#pragma omp simd aligned(out_ptr, cc_ptr: MEM_ALIGNMENT)
 			for (size_t j = 0; j < blocklen; ++j) {
 				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
 			}
@@ -218,6 +219,30 @@ void InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<u
 		output[i] *= norm;
 	}
 
+}
+
+
+void TTCheckValid(Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint32_t const wlen)
+{
+
+	// const size_t cclen = data_cc.ncol_;
+	const size_t hlen = wlen / 2;
+
+	const size_t ncc = ckeys.nrow_;
+	const size_t ngrid = ttable.ncol_;
+
+	// #pragma omp for
+	for (size_t i = 0; i < ncc; ++i)
+	{			
+		uint16_t *tts_sta1 = ttable.row(ckeys(i, 0));	
+		uint16_t *tts_sta2 = ttable.row(ckeys(i, 1));
+		
+		for (size_t j = 0; j < ngrid; ++j) {
+			int cix = hlen + tts_sta2[j] - tts_sta1[j];
+			assert(cix >= 0);
+			assert(cix < wlen);
+		}
+	}
 }
 
 
@@ -969,6 +994,19 @@ std::vector<float> MaxAndLoc(Vector<float>& power, Array2D<float>& gridlocs) {
 	float *wloc = gridlocs.row(amax);
 
 	std::vector<float> stats = {power[amax], wloc[0], wloc[1], wloc[2]};
+	return stats;
+}
+
+std::vector<float> SDMaxAndLoc(Vector<float>& power, Array2D<float>& gridlocs) {
+
+	size_t amax = std::distance(power.data_,
+			 std::max_element(power.begin(), power.end()));
+
+	float *wloc = gridlocs.row(amax);
+	float sd = process::standard_deviation(power.data_, power.size_);
+	float val = power[amax] / sd;
+
+	std::vector<float> stats = {val, wloc[0], wloc[1], wloc[2]};
 	return stats;
 }
 
