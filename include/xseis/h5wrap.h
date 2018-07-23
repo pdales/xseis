@@ -99,7 +99,7 @@ struct Dataset {
 		H5::DataSpace mspace(1, shape_);
 		dset_.read(vec.data_, dtype_, mspace, filespace_);
 		return vec;
-	}
+	}	
 
 };
 

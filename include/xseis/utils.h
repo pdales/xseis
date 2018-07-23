@@ -8,8 +8,10 @@
 #include <random>
 #include <type_traits>
 #include <functional>
+#include <map>
 
 #include "xseis/structures.h"
+
 namespace utils {
 
 template<typename T>
@@ -61,7 +63,7 @@ std::vector<T> linspace(T start, T stop, size_t size){
 		vec.reserve(size);
 
 		float step = (stop - start) / static_cast<float>(size);
-		std::cout << "step: " << step << '\n';
+		// std::cout << "step: " << step << '\n';
 
 		for (size_t i = 0; i < size; ++i) {
 			// vec[i] = start + step * static_cast<float>(i);
@@ -204,19 +206,35 @@ void CopyArrayDataOffsetKeys(Array2D<float>& data_in, Vector<uint32_t>& keeprows
 	}
 }
 
-void CopyArrayDataOffset(Array2D<float>& data_in, uint32_t offset, Array2D<float>& data_out)
+void CopyArrayDataOffset(Array2D<float>& data_in, uint32_t offset, Array2D<float>& data_out, size_t wlen=0)
 {
-	float *start_out;
-	float *start_in;
-	for (uint32_t i = 0; i < data_in.nrow_; ++i)
+	if (wlen == 0) wlen = data_out.ncol_;
+	
+	for (size_t i = 0; i < data_in.nrow_; ++i)
 	{	
-		start_in = data_in.row(i) + offset;
-		start_out = data_out.row(i);
-		for (uint32_t j = 0; j < data_out.ncol_; ++j) {
+		float *start_in = data_in.row(i) + offset;
+		float *start_out = data_out.row(i);
+		
+		for (size_t j = 0; j < wlen; ++j) {
 			start_out[j] = start_in[j];
 		}
 	}
 }
+
+
+// void CopyArrayDataOffsetZpad(Array2D<float>& data_in, size_t offset, size_t wlen, Array2D<float>& data_out)
+// {
+// 	float *start_out;
+// 	float *start_in;
+// 	for (size_t i = 0; i < data_in.nrow_; ++i)
+// 	{	
+// 		start_in = data_in.row(i) + offset;
+// 		start_out = data_out.row(i);
+// 		for (size_t j = 0; j < wlen; ++j) {
+// 			start_out[j] = start_in[j];
+// 		}
+// 	}
+// }
 
 // void copy_slice(Array2D<float>& data_in, Vector<uint32_t>& keeprows, uint32_t offset, Array2D<float>& data_out)
 // {
@@ -434,6 +452,17 @@ std::string ZeroPadInt(unsigned val, unsigned npad=5){
 void PrintMaxAndLoc(std::vector<float> v){
 	printf("%.6f (max) @ [%.0f, %.0f, %.0f] \n", v[0], v[1], v[2], v[3]);
 }
+
+void PrintMaxAndLoc(uint32_t vmax, float* loc, float scale=10000.){
+	printf("%.2f (max) @ [%.0f, %.0f, %.0f] \n", vmax / scale, loc[0], loc[1], loc[2]);
+}
+
+template <typename T>
+void PrintVec(std::vector<T> v){
+	for(auto& x : v) std::cout << x << ", ";		
+	printf("\n");
+}
+
 
 
 

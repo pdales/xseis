@@ -26,7 +26,8 @@ const uint32_t MEM_ALIGNMENT = CACHE_LINE;
 // 	// assert((uintptr_t) ptr * sizeof(T) % MEM_ALIGNMENT == 0);
 // 	assert((uintptr_t) ptr % MEM_ALIGNMENT == 0);
 // }
-	
+typedef std::vector<std::vector<size_t>> VVui64; 
+typedef std::vector<std::vector<uint16_t>> VVui16; 	
 
 
 template <typename T>
@@ -180,6 +181,7 @@ public:
 
 // template <typename T>
 // struct alignas(64) Aligned { T x;};
+
 
 template <typename T>
 class Array2D {
@@ -371,13 +373,6 @@ public:
 		Vector<T> vec = Vector<T>(start, ncol_, false);
 		return vec;		
 	}
-
-	// Array2D<T> copy()
-	// {
-	// 	auto acopy = Array2D<T>(nrow_, ncol_);
-	// 	std::copy(data_, data_ + size_, acopy.data_);
-	// 	return acopy;
-	// }
 	
 	void fill(T value){std::fill(data_, data_ + size_, value);}	
 };
@@ -445,16 +440,16 @@ public:
 		return points;
 	}
 
-	// size_t get_index(float *point){
+	size_t get_index(float *point){
 		
-	// 	x = point[0];
-	// 	y = point[1];
-	// 	z = point[2];
-	// 	ix = (x - xmin) / spacing;
-	// 	iy = (y - ymin) / spacing;
-	// 	iz = (z - zmin) / spacing;
-	// 	return (iz * nx * ny) + (iy * nx) + ix;
-	// }
+		x = point[0];
+		y = point[1];
+		z = point[2];
+		ix = (x - xmin) / spacing;
+		iy = (y - ymin) / spacing;
+		iz = (z - zmin) / spacing;
+		return (iz * nx * ny) + (iy * nx) + ix;
+	}
 
 	// void get_point(size_t index, float *buf){
 				

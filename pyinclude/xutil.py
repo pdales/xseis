@@ -17,6 +17,15 @@ import math
 from scipy.fftpack import fft, ifft, rfft, fftfreq
 
 
+def g2mad(grid):
+	# return max, median and median absolute dev
+	med = np.median(grid)
+	mad = np.median(np.abs(grid - med))
+	# mad = max(mad, 1)
+	out = (grid - med) / mad
+	return out
+
+
 def randomize_band(fsig, band, sr):
 
 	fnew = fsig.copy()
@@ -90,7 +99,7 @@ def MeanDist(data):
 	vals = []
 	for j, ix in enumerate(inds):
 		print(j)
-		lmax = data[:, ix, 1:]
+		lmax = data[:-1, ix, 1:]
 		x, y, z = lmax.T
 		err = np.std(x) + np.std(y) + np.std(z)
 		vals.append(err)
@@ -221,7 +230,7 @@ def combine_grids(fles, shape):
 	grids = np.zeros((nfle, nz, ny, nx), dtype=np.float32)
 
 	for i, fn in enumerate(fles):
-		print(fn)
+		# print(fn)
 		# xl, yl, zl = lims.reshape(3, 2)
 		grid = np.load(fn).reshape(nz, ny, nx)
 		grids[i] = grid
@@ -236,6 +245,16 @@ def xyz_max(grid, lims, spacing):
 	pt = np.array(np.unravel_index(iwin, grid.shape))[::-1]
 	pt = pt * spacing + lims[:, 0]
 	return pt
+
+
+def xyz_index(loc, lims, spacing):
+	# thresh = np.std(grid) * nstd
+	shape = (np.diff(lims).T[0] / spacing).astype(int)
+	nx, ny, nz = shape
+	# x, y, z = loc
+	inds = ((loc - lims[:, 0]) / spacing).astype(int)
+	ix, iy, iz = inds
+	return (iz * nx * ny) + (iy * nx) + ix
 
 
 def remap(x, out_min, out_max):
@@ -373,6 +392,15 @@ def phase(sig):
 	return np.exp(1j * np.angle(sig))
 
 
+def whiten2D(a, freqs, sr):
+	wl = a.shape[1]
+	win = freq_window(freqs, wl, sr)
+	af = fft(a)
+	for sx in range(a.shape[0]):
+		whiten_freq(af[sx], win)
+	a[:] = np.real(ifft(af))
+
+
 def whiten(sig, win):
 	"""Whiten signal, modified from MSNoise."""
 	npts = len(sig)
@@ -417,3 +445,65 @@ def taper2d(data, wlen):
 	for i in range(data.shape[0]):
 		data[i][:wlen] *= tap
 		data[i][-wlen:] *= tap[::-1]
+
+
+def amax_cc(sig):
+	return np.argmax(sig) - len(sig) // 2
+
+
+def angle(a, b):
+	# return np.arctan((a[1] - b[1]) / (a[0] - b[0]))
+	return np.arctan2((a[1] - b[1]), (a[0] - b[0]))
+
+
+def fftnoise(f):
+	f = np.array(f, dtype='complex')
+	Np = (len(f) - 1) // 2
+	phases = np.random.rand(Np) * 2 * np.pi
+	phases = np.cos(phases) + 1j * np.sin(phases)
+	f[1:Np + 1] *= phases
+	f[-1:-1 - Np:-1] = np.conj(f[1:Np + 1])
+	return ifft(f).real
+
+
+def band_noise(freqmin, freqmax, samples, sr):
+	freqs = np.abs(fftfreq(samples, 1. / sr))
+	f = np.zeros(samples)
+	idx = np.where(np.logical_and(freqs >= freqmin, freqs <= freqmax))[0]
+	f[idx] = 1
+	return fftnoise(f)
+
+
+def add_noise(data, band, sr, power):
+	freqmin, freqmax = band
+	samples = data.shape[1]
+	for d in data:
+		d += band_noise(freqmin, freqmax, samples, sr) * power
+
+
+# def pairs_excluding_acoustic():
+		# fd = rfft(sig)
+	# # keys = np.arange(ds.shape[0])
+	# # ckeys = np.array(list(itertools.combinations(keys, 2))).astype(np.int32)
+	# ckeys = ck
+	# scut = 700
+	# avel = 345.
+	# sloc = srcs[0]
+
+	# dd0 = np.array([xutil.dist_between(l, sloc) for l in locs])
+	# dd1 = np.diff(dd0[ckeys], axis=1)
+	# ia = dd1 / avel * sr
+	# # plt.hist(np.abs(ia), bins=100)
+	# ik0 = np.where(np.abs(ia) < scut)[0]
+	# sloc = srcs[1]
+	# dd0 = np.array([xutil.dist_between(l, sloc) for l in locs])
+	# dd1 = np.diff(dd0[ckeys], axis=1)
+	# ia = dd1 / avel * sr
+	# # plt.hist(np.abs(ia), bins=100)
+	# ik1 = np.where(np.abs(ia) < scut)[0]
+	# ik = np.unique(np.concatenate((ik0, ik1)))
+	# ck2 = np.delete(ckeys, ik, axis=0)
+	# xplot.stations(locs, ckeys=ck2[::500])
+	# dd = np.linalg.norm(np.diff(locs[ck2], axis=1).reshape(-1, 3), axis=1)
+	# # plt.hist(dd, bins=100)
+	# cki = np.where(dd < 1000)[0]

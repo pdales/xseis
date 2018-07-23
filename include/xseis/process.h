@@ -154,6 +154,16 @@ inline void Accumulate(fftwf_complex const* const data, fftwf_complex* const sta
 	}
 }
 
+#pragma omp declare simd aligned(data, stack:MEM_ALIGNMENT)
+inline void Accumulate(float const* const data, float* const stack,
+						 uint32_t const npts)
+{		
+	#pragma omp simd aligned(data, stack:MEM_ALIGNMENT)
+	for(uint32_t i = 0; i < npts; ++i) {
+		stack[i] += data[i];
+	}
+}
+
 #pragma omp declare simd aligned(sig:MEM_ALIGNMENT)
 void Whiten(fftwf_complex* const sig, uint32_t const npts)
 {		
@@ -171,6 +181,15 @@ void Absolute(fftwf_complex const* const sig, float* out, uint32_t const npts)
 	#pragma omp simd aligned(sig, out:MEM_ALIGNMENT)
 	for(uint32_t i = 0; i < npts; ++i) {
 		out[i] = std::sqrt(sig[i][0] * sig[i][0] + sig[i][1] * sig[i][1]);
+	}
+}
+
+#pragma omp declare simd aligned(sig:MEM_ALIGNMENT)
+void Absolute(float* sig, uint32_t const npts)
+{		
+	#pragma omp simd aligned(sig:MEM_ALIGNMENT)
+	for(uint32_t i = 0; i < npts; ++i) {
+		sig[i] = std::abs(sig[i]);
 	}
 }
 
@@ -535,7 +554,7 @@ void absolute(float *sig, size_t npts)
 }
 
 
-void roll(float* sig, size_t npts, int nroll)
+void Roll(float* sig, size_t npts, long nroll)
 {
 	std::rotate(sig, sig + nroll, sig + npts);
 }
@@ -636,12 +655,12 @@ void SlidingWinMax(float *sig, size_t npts, size_t wlen)
 
 }
 
+
 void Multiply(float *sig, size_t npts, float val){
 	for (size_t i = 0; i < npts; ++i){
 		sig[i] *= val;
 	}
 }
-
 
 void Multiply(fftwf_complex* data, size_t npts, float val)
 {		
@@ -652,11 +671,26 @@ void Multiply(fftwf_complex* data, size_t npts, float val)
 }
 
 
+template<typename Container>
+void Multiply(Container& data, float val) {
+	Multiply(data.data_, data.size_, val);
+}
+
+
+
+
 void Fill(fftwf_complex* data, size_t npts, float val)
 {		
 	for(size_t i = 0; i < npts; ++i) {
 		data[i][0] = val;
 		data[i][1] = val;
+	}
+}
+
+void Fill(float* data, size_t npts, float val)
+{		
+	for(size_t i = 0; i < npts; ++i) {
+		data[i] = val;		
 	}
 }
 
@@ -682,6 +716,11 @@ void Copy(fftwf_complex const *in, size_t npts, fftwf_complex *out)
 	std::copy(&(in)[0][0], &(in + npts)[0][0], &out[0][0]);
 }
 
+void Copy(float const *in, size_t npts, float *out)
+{		
+	std::copy(in, in + npts, out);
+}
+
 
 
 void Subtract(fftwf_complex const *data, fftwf_complex *data_mod, size_t npts)
@@ -696,12 +735,13 @@ void Subtract(fftwf_complex const *data, fftwf_complex *data_mod, size_t npts)
 #pragma omp declare simd aligned(sig:MEM_ALIGNMENT)
 float Energy(const fftwf_complex *sig, uint32_t const nfreq)
 {
+	// E = 1/N sum(|x(f)**2|)
 	float tmp = 0;
 	#pragma omp simd aligned(sig:MEM_ALIGNMENT)
 	for (uint32_t i = 0; i < nfreq; ++i){
 		tmp += sig[i][0] * sig[i][0] + sig[i][1] * sig[i][1];
 	}
-	return tmp;
+	return tmp / static_cast<float>(nfreq);
 }
 
 // Cross-correlate complex signals, cc(f) = s1(f) x s2*(f)

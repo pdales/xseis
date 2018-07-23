@@ -65,20 +65,14 @@ Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2
 void InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, Vector<float>& output, float scale_pwr=100)
 {
 
-	// assert(output.data_ * sizeof(float) % CACHE_LINE == 0);
 	assert((uintptr_t) output.data_ % MEM_ALIGNMENT == 0);
 	assert((uintptr_t) data_cc.row(1) % MEM_ALIGNMENT == 0);
-	assert((uintptr_t) ttable.row(10) % MEM_ALIGNMENT == 0);
+	assert((uintptr_t) ttable.row(1) % MEM_ALIGNMENT == 0);
 
-	// assert((uintptr_t) &data_cc[1] % MEM_ALIGNMENT == 0);
-
-
-	// assert_aligned(output.data_);
-	// assert_aligned(ttable.row(1));
-	// assert_aligned(data_cc.row(1));
 
 	const size_t hlen = data_cc.ncol_ / 2;	
-	const size_t ngrid = ttable.ncol_;
+	// const size_t ngrid = ttable.ncol_;
+	const size_t ngrid = output.size_;
 
 	output.fill(0);
 
@@ -109,6 +103,47 @@ void InterLocPatch(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vecto
 
 }
 
+
+void InterLocPatchNoAlign(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std::vector<uint>& ix_patch, Array2D<uint16_t>& ttable, Vector<float>& output, float scale_pwr=100)
+{
+
+	assert((uintptr_t) output.data_ % MEM_ALIGNMENT == 0);
+	assert((uintptr_t) data_cc.row(1) % MEM_ALIGNMENT == 0);
+	// assert((uintptr_t) ttable.row(1) % MEM_ALIGNMENT == 0);
+
+
+	const size_t hlen = data_cc.ncol_ / 2;	
+	// const size_t ngrid = ttable.ncol_;
+	const size_t ngrid = output.size_;
+
+	output.fill(0);
+
+	float *out_ptr = output.begin();
+	float *cc_ptr = nullptr;
+	uint16_t *tts_sta1, *tts_sta2;
+	size_t ix;
+
+	for(size_t i = 0; i < ix_patch.size(); ++i) {
+
+		ix = ix_patch[i];		
+		tts_sta1 = ttable.row(ckeys(ix, 0));
+		tts_sta2 = ttable.row(ckeys(ix, 1));
+		cc_ptr = data_cc.row(ix);
+
+		// Migrate single ccf on to grid based on tt difference
+		// #pragma omp simd aligned(out_ptr, cc_ptr, tts_sta1, tts_sta2: MEM_ALIGNMENT)
+		#pragma omp simd aligned(out_ptr, cc_ptr: MEM_ALIGNMENT)
+		for (size_t j = 0; j < ngrid; ++j) {
+			out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
+		}
+	}
+
+	float norm = scale_pwr / static_cast<float>(ix_patch.size());	
+	for(size_t i = 0; i < output.size_; ++i) {
+		output[i] *= norm;
+	}
+
+}
 
 // Vector<float> InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, size_t blocksize=1024 * 5, float scale_pwr=100)
 // {
@@ -466,7 +501,29 @@ Array2D<uint16_t> BuildTTablePerturbVel(Array2D<float>& stalocs, Array2D<float>&
 }
 
 
-void FillTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, float vel, float sr, Array2D<uint16_t>& ttable)
+// void FillTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, float vel, float sr, Array2D<uint16_t>& ttable)
+// {
+
+// 	float vsr = sr / vel;
+// 	float dist;
+// 	float *sloc = nullptr;
+// 	uint16_t *tt_row = nullptr;
+
+// 	#pragma omp parallel for private(sloc, tt_row, dist)
+// 	for (size_t i = 0; i < ttable.nrow_; ++i)
+// 	{
+// 		sloc = stalocs.row(i);
+// 		tt_row = ttable.row(i);
+
+// 		for (size_t j = 0; j < ttable.ncol_; ++j) 
+// 		{
+// 			dist = process::DistCartesian(sloc, gridlocs.row(j));			
+// 			tt_row[j] = static_cast<uint16_t>(dist * vsr + 0.5);
+// 		}
+// 	}
+// }
+
+void FillTravelTimeTable(Array2D<float>& locs1, Array2D<float>& locs2, float vel, float sr, Array2D<uint16_t>& ttable)
 {
 
 	float vsr = sr / vel;
@@ -477,12 +534,12 @@ void FillTravelTimeTable(Array2D<float>& stalocs, Array2D<float>& gridlocs, floa
 	#pragma omp parallel for private(sloc, tt_row, dist)
 	for (size_t i = 0; i < ttable.nrow_; ++i)
 	{
-		sloc = stalocs.row(i);
+		sloc = locs1.row(i);
 		tt_row = ttable.row(i);
 
 		for (size_t j = 0; j < ttable.ncol_; ++j) 
 		{
-			dist = process::DistCartesian(sloc, gridlocs.row(j));			
+			dist = process::DistCartesian(sloc, locs2.row(j));			
 			tt_row[j] = static_cast<uint16_t>(dist * vsr + 0.5);
 		}
 	}
@@ -882,91 +939,91 @@ uint TotalNPairsDistAngleFilt(Vector<uint16_t>& keys, Array2D<float>& stalocs, f
 
 
 
-Vector<uint16_t> GetStationKeysNear(Vector<float>& loc, Array2D<float>& stalocs, float max_dist) {
+// Vector<uint16_t> GetStationKeysNear(Vector<float>& loc, Array2D<float>& stalocs, float max_dist) {
 
-	std::vector<uint16_t> stakeep;
-	float dist;
+// 	std::vector<uint16_t> stakeep;
+// 	float dist;
 
-	for(size_t i = 0; i < stalocs.nrow_; ++i) {
+// 	for(size_t i = 0; i < stalocs.nrow_; ++i) {
 
-		dist = process::DistCartesian2D(loc.data_, stalocs.row(i));		
-		if(dist < max_dist) {
-			stakeep.push_back(i);
-		}
-	}
-	auto out = Vector<uint16_t>(stakeep);
+// 		dist = process::DistCartesian2D(loc.data_, stalocs.row(i));		
+// 		if(dist < max_dist) {
+// 			stakeep.push_back(i);
+// 		}
+// 	}
+// 	auto out = Vector<uint16_t>(stakeep);
 
-	return out;
-}
+// 	return out;
+// }
 
-Vector<float> DistDiffFromCkeys(Array2D<uint16_t>& ckeys, Array2D<float>& stalocs, float sr) {
+// Vector<float> DistDiffFromCkeys(Array2D<uint16_t>& ckeys, Array2D<float>& stalocs, float sr) {
 
-	auto dist_diff = Vector<float>(ckeys.nrow_);
+// 	auto dist_diff = Vector<float>(ckeys.nrow_);
 
-	uint16_t *ckp = nullptr;
+// 	uint16_t *ckp = nullptr;
 
-	for(size_t i = 0; i < ckeys.nrow_; ++i) {
-		ckp = ckeys.row(i);
+// 	for(size_t i = 0; i < ckeys.nrow_; ++i) {
+// 		ckp = ckeys.row(i);
 
-		dist_diff[i] = process::DistCartesian(stalocs.row(ckp[0]), stalocs.row(ckp[1]));
+// 		dist_diff[i] = process::DistCartesian(stalocs.row(ckp[0]), stalocs.row(ckp[1]));
 		
-	}
-	return dist_diff;
-}
+// 	}
+// 	return dist_diff;
+// }
 
-// Build groups of ckeys for stas within radius of mid_stas
-std::vector<std::vector<uint16_t>> CkeyPatchesFromStations(std::vector<uint>& mid_stas, Array2D<float>& stalocs, float radius, float cdist_min, float cdist_max, bool ang_filt=true) 
-{
+// // Build groups of ckeys for stas within radius of mid_stas
+// std::vector<std::vector<uint16_t>> CkeyPatchesFromStations(std::vector<uint>& mid_stas, Array2D<float>& stalocs, float radius, float cdist_min, float cdist_max, bool ang_filt=true) 
+// {
 
-	// std::vector<uint16_t> ckeys_vec;
-	std::vector<std::vector<uint16_t>> patches;
+// 	// std::vector<uint16_t> ckeys_vec;
+// 	std::vector<std::vector<uint16_t>> patches;
 
-	for(auto&& ix : mid_stas) {
-		auto loc_patch = stalocs.row_view(ix);
-		auto pkeys = GetStationKeysNear(loc_patch, stalocs, radius);
-		patches.push_back(AllPairsFilt(pkeys, stalocs, cdist_min, cdist_max, ang_filt));
-	}
-	return patches;
-}
+// 	for(auto&& ix : mid_stas) {
+// 		auto loc_patch = stalocs.row_view(ix);
+// 		auto pkeys = GetStationKeysNear(loc_patch, stalocs, radius);
+// 		patches.push_back(AllPairsFilt(pkeys, stalocs, cdist_min, cdist_max, ang_filt));
+// 	}
+// 	return patches;
+// }
 
-// Builds ckey index from groups of ckeys
-std::vector<std::vector<uint>> IndexesFromCkeyPatches(std::vector<std::vector<uint16_t>>& patches) 
-{
-	std::vector<std::vector<uint>> ipatches;
+// // Builds ckey index from groups of ckeys
+// std::vector<std::vector<uint>> IndexesFromCkeyPatches(std::vector<std::vector<uint16_t>>& patches) 
+// {
+// 	std::vector<std::vector<uint>> ipatches;
 
-	size_t csum = 0;
-	for(auto&& patch : patches) {
-		size_t ncc = patch.size() / 2;
-		std::vector<uint> ipatch;
-		ipatch.reserve(ncc);
+// 	size_t csum = 0;
+// 	for(auto&& patch : patches) {
+// 		size_t ncc = patch.size() / 2;
+// 		std::vector<uint> ipatch;
+// 		ipatch.reserve(ncc);
 
-		for(size_t i = 0; i < ncc; ++i) {
-			ipatch.push_back(i + csum);
-		}
-		ipatches.push_back(ipatch);
-		csum += ncc;
-	}
-	return ipatches;
-}
+// 		for(size_t i = 0; i < ncc; ++i) {
+// 			ipatch.push_back(i + csum);
+// 		}
+// 		ipatches.push_back(ipatch);
+// 		csum += ncc;
+// 	}
+// 	return ipatches;
+// }
 
-// Builds ckey index from groups of ckeys
-Array2D<uint16_t> CkeysFromPatches(std::vector<std::vector<uint16_t>>& patches) 
-{
-	// std::vector<std::vector<size_t>> ipatches;
-	size_t ncc = 0;
-	for(auto&& patch : patches) {ncc += patch.size() / 2;}
+// // Builds ckey index from groups of ckeys
+// Array2D<uint16_t> CkeysFromPatches(std::vector<std::vector<uint16_t>>& patches) 
+// {
+// 	// std::vector<std::vector<size_t>> ipatches;
+// 	size_t ncc = 0;
+// 	for(auto&& patch : patches) {ncc += patch.size() / 2;}
 
-	auto ckeys = Array2D<uint16_t>(ncc, 2);
+// 	auto ckeys = Array2D<uint16_t>(ncc, 2);
 
-	size_t csum = 0;
-	auto ptr = ckeys.data_;
+// 	size_t csum = 0;
+// 	auto ptr = ckeys.data_;
 
-	for(auto&& vec : patches) {
-		std::copy(vec.begin(), vec.end(), ptr);
-		ptr += vec.size();		
-	}
-	return ckeys;
-}
+// 	for(auto&& vec : patches) {
+// 		std::copy(vec.begin(), vec.end(), ptr);
+// 		ptr += vec.size();		
+// 	}
+// 	return ckeys;
+// }
 
 
 
@@ -996,6 +1053,99 @@ std::vector<float> MaxAndLoc(Vector<float>& power, Array2D<float>& gridlocs) {
 	std::vector<float> stats = {power[amax], wloc[0], wloc[1], wloc[2]};
 	return stats;
 }
+
+std::vector<uint32_t> VAMax(Vector<float>& power, uint32_t scale=10000) {
+
+	uint32_t amax = process::argmax(power);
+	uint32_t vmax = static_cast<uint32_t>(power[amax] * scale);
+	std::vector<uint32_t> stats = {vmax, amax};
+	return stats;
+}
+
+
+std::vector<uint32_t> VASMax(Vector<float>& power, uint32_t scale=10000) {
+
+	float sd = process::standard_deviation(power.data_, power.size_);
+	float mean = process::mean(power.data_, power.size_);
+
+	uint32_t amax = process::argmax(power);
+	// uint32_t vmax = static_cast<uint32_t>(power[amax] * scale) ;
+	uint32_t vstd = static_cast<uint32_t>((power[amax] - mean) / sd * scale) ;
+
+	std::vector<uint32_t> stats = {vstd, amax};
+	// std::vector<uint32_t> stats = {vmax, vstd, amax};
+	return stats;
+}
+
+std::vector<uint32_t> MADMax(Vector<float>& power, uint32_t scale=10000) {
+	// destroys input
+	size_t npts = power.size_;
+	auto ptr = power.data_;
+
+	uint32_t amax = process::argmax(power);
+	float vmax = power[amax];
+
+	size_t half = npts / 2;
+	std::nth_element(ptr, ptr + half, ptr + npts);
+	float med = ptr[half];
+	// float mean = process::mean(ptr, npts);
+
+	for(size_t i = 0; i < npts; ++i) {
+		ptr[i] = std::abs(ptr[i] - med);
+	}
+
+	std::nth_element(ptr, ptr + half, ptr + npts);
+	float mad = ptr[half];
+	// float mdev = (vmax - med) / mad;
+	uint32_t mdev = static_cast<uint32_t>((vmax - med) / mad * scale) ;
+
+	std::vector<uint32_t> stats = {mdev, amax};
+	return stats;
+}
+
+
+Vector<float> out2MAD(Vector<float>& power, uint32_t scale=10000) {
+	// destroys input
+	size_t npts = power.size_;
+	auto ptr = power.data_;
+
+	auto out = Vector<float>(npts);
+	process::Copy(ptr, npts, out.data_);
+
+	size_t half = npts / 2;
+	std::nth_element(ptr, ptr + half, ptr + npts);
+	float med = ptr[half];
+
+	for(size_t i = 0; i < npts; ++i) {
+		ptr[i] = std::abs(ptr[i] - med);
+	}
+
+	std::nth_element(ptr, ptr + half, ptr + npts);
+	float mad = ptr[half];
+
+	for(size_t i = 0; i < npts; ++i) {
+		float val = (out[i] - med) / mad;
+		ptr[i] = out[i];
+		out[i] = val;
+	}
+
+	return out;
+}
+
+
+std::vector<float> VAMMax(Vector<float>& power) {
+
+	float sd = process::standard_deviation(power.data_, power.size_);
+	float mean = process::mean(power.data_, power.size_);
+
+	size_t amax = process::argmax(power);
+	float vmax = power[amax];
+
+	std::vector<float> stats = {(float) amax, vmax, mean, sd};
+	return stats;
+}
+
+
 
 std::vector<float> SDMaxAndLoc(Vector<float>& power, Array2D<float>& gridlocs) {
 

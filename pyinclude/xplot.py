@@ -118,9 +118,22 @@ def im(d, norm=True, savedir=None, tkey='im_raw', cmap='viridis', aspect='auto',
 		plt.title(title)
 	# manager = plt.get_current_fig_manager()
 	# manager.resize(*manager.window.maxsize())
-	plt.tight_layout()
+	# plt.tight_layout()
 	savefig(fig, savedir, tkey)
 
+
+def im_ax(d, ax, norm=True, cmap='viridis', aspect='auto', extent=None):
+
+	if norm is True:
+		dtmp = d / np.max(np.abs(d), axis=1)[:, np.newaxis]
+	else:
+		dtmp = d
+	im = ax.imshow(dtmp, origin='lower', aspect=aspect, extent=extent,
+			   cmap=cmap, interpolation='none')
+	if extent is not None:
+		ax.set_xlim(extent[:2])
+		ax.set_ylim(extent[2:])
+	
 
 def freq_compare(sigs, sr, xlim=None):
 
@@ -145,14 +158,14 @@ def freq_compare(sigs, sr, xlim=None):
 def freq(sig, sr, xlim=None):
 
 	plt.subplot(211)
-	plt.plot(sig)
+	plt.plot(sig, marker='o', alpha=1, markersize=3)
 	plt.xlabel('Time')
 	plt.subplot(212)
 	f = fftpack.fft(sig)
 	freq = fftpack.fftfreq(len(f), d=1. / sr)
 	# freq = np.fft.fftshift(freq)
 
-	plt.plot(np.fft.fftshift(freq), np.fft.fftshift(np.abs(f)))
+	plt.plot(np.fft.fftshift(freq), np.fft.fftshift(np.abs(f)), marker='o', alpha=1, markersize=3)
 	if xlim is not None:
 		plt.xlim(xlim)
 	else:
@@ -290,6 +303,7 @@ def spectro(sig, wl, sr, stepsize=None, norm=False):
 
 	plt.subplot(212)
 	plt.plot(sig)
+	plt.xlabel('time')
 	plt.xlim([0, npts])
 	plt.subplot(211)
 	freqs = fftfreq(wl, d=1. / sr)
@@ -301,4 +315,30 @@ def spectro(sig, wl, sr, stepsize=None, norm=False):
 	if norm:
 		imd /= np.max(imd, axis=0)
 	plt.imshow(imd, aspect='auto', origin='lower', interpolation='none', extent=extent)
+	plt.ylabel('freq (hz)')
+
+
+def ax_spectro(ax, sig, wl, sr, stepsize=None, norm=False):
+
+	if stepsize is None:
+		stepsize = wl // 2
+
+	npts = len(sig)
+	slices = xutil.build_slice_inds(0, npts, wl, stepsize=stepsize)
+	nsl = len(slices)
+	df = np.zeros((nsl, wl), dtype=np.complex)
+
+	for i, sl in enumerate(slices):
+		df[i] = fft(sig[sl[0]:sl[1]])
+
+	freqs = fftfreq(wl, d=1. / sr)
+	# plt.imshow(np.abs(df), aspect='auto', extent=extent, origin='lower', interpolation='none')
+	fsr = wl / sr
+	imd = np.abs(df[:, : wl // 3]).T
+	extent = [0, df.shape[0], freqs[0], (wl // 3) / fsr]
+
+	if norm:
+		imd /= np.max(imd, axis=0)
+	ax.imshow(imd, aspect='auto', origin='lower', interpolation='none', extent=extent)
+
 
