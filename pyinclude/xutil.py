@@ -238,6 +238,18 @@ def combine_grids(fles, shape):
 	return grids
 
 
+def combine_grids_nll(fles, shape):
+
+	nx, ny, nz = shape
+	nfle = len(fles)
+	grids = np.zeros((nfle, nx, ny, nz), dtype=np.float32)
+
+	for i, fn in enumerate(fles):
+		grids[i] = np.load(fn).reshape(shape)
+
+	return grids
+
+
 def xyz_max(grid, lims, spacing):
 	# thresh = np.std(grid) * nstd
 	iwin = np.argmax(grid)
