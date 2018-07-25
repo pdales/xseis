@@ -1,5 +1,3 @@
-#ifndef ILOC_H
-#define ILOC_H
 // #include <fftw3.h>
 #include <cstring>
 #include <omp.h>
