@@ -765,6 +765,35 @@ float XCorrEnergy(fftwf_complex const *sig1, fftwf_complex const *sig2, uint32_t
 }
 
 
+// def get_pt(index, shape, spacing, origin):
+// 	nx, ny, nz = shape
+// 	# nx, ny, nz = spacing
+// 	iz = index % nz
+// 	iy = ((index - iz) / nz) % ny
+// 	ix = index / (nz * ny)
+
+// 	loc = np.array([ix, iy, iz], dtype=np.float32) * spacing + origin
+// 	return loc
+
+std::vector<float> get_point(size_t index, int spacing, int* origin, int* shape){
+	
+	int nx = shape[0];			
+	int ny = shape[1];			
+	int nz = shape[2];
+	int iz = index % nz;
+	int iy = ((index - iz) / nz) % ny;
+	int ix = index / (nz * ny);
+
+	std::vector<float> v(3);
+	v[0] = ix * spacing + origin[0];
+	v[1] = iy * spacing + origin[1];
+	v[2] = iz * spacing + origin[2];
+	return v;
+}
+
+
+
+
 }
 
 #endif
