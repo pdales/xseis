@@ -1,7 +1,12 @@
 /*
+* @Author: Philippe Dales
+* @Date:   2018-07-26 14:26:23
+* @Last Modified by:   Philippe Dales
+* @Last Modified time: 2018-07-26 14:26:23
+*/
+/*
 Data structures
 */
-
 
 #ifndef STRUCTURES_H
 #define STRUCTURES_H
@@ -42,12 +47,12 @@ class Vector {
 public:
 	size_t size_ = 0;
 	T *data_ = nullptr;
-	bool owns_ = true;
+	bool owns_ = false;
 
 
 	Vector() {}
 	// init from existing c-array with optional ownership
-	Vector(T *data, size_t size, bool owns=true)
+	Vector(T *data, size_t size, bool owns=false)
 	:size_(size), data_(data), owns_(owns)
 	{}
 
@@ -195,11 +200,11 @@ public:
 	bool owns_;
 
 	// default constructor
-	Array2D() :data_(nullptr), nrow_(0), ncol_(0), size_(0), owns_(true)
+	Array2D() :data_(nullptr), nrow_(0), ncol_(0), size_(0), owns_(false)
 	{}
 
 	// init from existing c-array with optional ownership
-	Array2D(T *data, size_t nrow, size_t ncol, bool owns=true)	 
+	Array2D(T *data, size_t nrow, size_t ncol, bool owns=false)	 
 	:data_(data), nrow_(nrow), ncol_(ncol), size_(nrow * ncol), owns_(owns)
 	{}
 
@@ -208,6 +213,7 @@ public:
 	: nrow_(nrow), ncol_(ncol), owns_(true){
 		size_ = (size_t) nrow_ * ncol_;
 		data_ = size_ ? malloc_cache_align<T>(size_) : nullptr;
+		// std::cout << "alloc_constructor: " << owns_ << '\n';
 		// int* a = (int*) _aligned_malloc(10 * sizeof(int), 4096);
 
 		// data_ = new Aligned<T>[size_];
@@ -260,21 +266,6 @@ public:
 		swap(*this, other);
 	}
 
-
-
-	// Array2D(const Array2D &that) {
-	// 	nrow_ = that.nrow_;
-	// 	ncol_ = that.ncol_;
-	// 	size_ = that.size_;
-	// 	shape_[0] = nrow_;
-	// 	shape_[1] = ncol_;
-	// 	// data_ = that.data_;
-	// 	// owns_ = false;
-	// 	data_ = new T[size_];
-	// 	std::copy(that.data_, that.data_ + size_, data_);
-	// 	// data_ = that.data_;
-	// 	owns_ = true;		
-	// }
 
 	// Get value at flattened index ix
 	T& operator[] (size_t ix){return data_[ix];}
@@ -571,6 +562,7 @@ struct Clock {
 		tnow = clock::now();
 		stamps.push_back(stamp(name, std::chrono::duration_cast<micro>(tnow - t0)));
 		t0 = tnow;
+		std::cout << name << '\n';
 	}
 
 	void print(){

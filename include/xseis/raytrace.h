@@ -1,4 +1,10 @@
 /*
+* @Author: Philippe Dales
+* @Date:   2018-07-26 14:26:23
+* @Last Modified by:   Philippe Dales
+* @Last Modified time: 2018-07-26 14:26:23
+*/
+/*
 Ray-tracer helper functions for estuary package
 */
 #ifndef RAYTRACE_H

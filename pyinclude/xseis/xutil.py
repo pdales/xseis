@@ -2,19 +2,82 @@
 
 import numpy as np
 import math
-# import os
+from scipy.fftpack import fft, ifft, fftfreq
+import os
 # import pickle
 # import matplotlib.pyplot as plt
 # import matplotlib.gridspec as gridspec
 # import subprocess
 # import h5py
-# import glob
+import glob
 # import datetime
 # from scipy.signal import sosfilt, zpk2sos, iirfilter
 # from scipy.fftpack import fft, ifft, rfft, fftfreq
 # import matplotlib.colors
 # import matplotlib.cm as cm
-from scipy.fftpack import fft, ifft, rfft, fftfreq
+
+
+def get_pt(index, shape, spacing, origin):
+	nx, ny, nz = shape
+	iz = index % nz
+	iy = ((index - iz) // nz) % ny
+	ix = index // (nz * ny)
+
+	loc = np.array([ix, iy, iz]) * spacing + origin
+	return loc
+
+
+def imax_to_xyz_gdef(index, gdef):
+	shape, origin, spacing = gdef[:3], gdef[3:6], gdef[6]
+	nx, ny, nz = shape
+	iz = index % nz
+	iy = ((index - iz) // nz) % ny
+	ix = index // (nz * ny)
+
+	loc = np.array([ix, iy, iz]) * spacing + origin
+	return loc
+
+
+def ttable_from_nll_grids(path, key="OT.P"):
+	fles = np.sort(glob.glob(os.path.join(path, key + '*.time.buf')))
+	hfles = np.sort(glob.glob(os.path.join(path, key + '*.time.hdr')))
+	assert(len(fles) == len(hfles))
+	stas = np.array([f.split('.')[-3].zfill(3) for f in fles], dtype='S4')
+	isort = np.argsort(stas)
+	fles = fles[isort]
+	hfles = hfles[isort]
+	names = stas[isort]
+
+	vals = [read_nll_header(fle) for fle in hfles]
+	sloc, shape, org, spacing = vals[0]
+	slocs = np.array([v[0] for v in vals], dtype=np.float32)
+	ngrid = np.product(shape)
+
+	nsta = len(fles)
+	tts = np.zeros((nsta, ngrid), dtype=np.float32)
+
+	for i in range(nsta):
+		gdata = np.fromfile(fles[i], dtype='f4')
+		tts[i] = gdata
+
+	gdef = np.concatenate((shape, org, [spacing])).astype(np.int32)
+
+	ndict = {}
+	for i, sk in enumerate(names):
+		ndict[sk.decode('utf-8')] = i
+
+	return tts, slocs, ndict, gdef
+
+
+def read_nll_header(fle):
+	# print(fle)
+	dat = open(fle).read().split()
+	shape = np.array(dat[:3], dtype=int)
+	org = np.array(dat[3:6], dtype=np.float32) * 1000.
+	spacing = (np.array(dat[6:9], dtype=np.float32) * 1000.)[0]
+	sloc = np.array(dat[12:15], dtype=np.float32) * 1000.
+
+	return sloc, shape, org, spacing
 
 
 def g2mad(grid):
@@ -345,20 +408,20 @@ def cross_corr(sig1, sig2, norm=True, pad=False, phase_only=False, phat=False):
 	return np.roll(cc, len(cc) // 2)
 
 
-def xcorr_freq(sig1f, sig2f):
-	"""Cross-correlate two signals."""
+# def xcorr_freq(sig1f, sig2f):
+# 	"""Cross-correlate two signals."""
 	
-	ccf = np.conj(sig1f) * sig2f
+# 	ccf = np.conj(sig1f) * sig2f
 
-	if phat:
-		ccf = ccf / np.abs(ccf)
+# 	if phat:
+# 		ccf = ccf / np.abs(ccf)
 
-	cc = np.real(ifft(ccf))
+# 	cc = np.real(ifft(ccf))
 
-	if norm:
-		cc /= np.sqrt(energy(sig1) * energy(sig2))
+# 	if norm:
+# 		cc /= np.sqrt(energy(sig1) * energy(sig2))
 
-	return np.roll(cc, len(cc) // 2)
+# 	return np.roll(cc, len(cc) // 2)
 
 
 def energy(sig, axis=None):
@@ -384,7 +447,7 @@ def build_slice_inds(start, stop, wlen, stepsize=None):
 def freq_window(cf, npts, sr):
 	nfreq = int(npts // 2 + 1)
 	fsr = npts / sr
-	cf = np.array(cf)
+	cf = np.array(cf, dtype=float)
 	cx = (cf * fsr + 0.5).astype(int)
 
 	win = np.zeros(nfreq, dtype=np.float32)

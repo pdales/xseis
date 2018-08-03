@@ -1,3 +1,9 @@
+/*
+* @Author: Philippe Dales
+* @Date:   2018-07-26 14:26:23
+* @Last Modified by:   Philippe Dales
+* @Last Modified time: 2018-07-26 14:26:23
+*/
 #ifndef UTILS_H
 #define UTILS_H
 #include <iostream>

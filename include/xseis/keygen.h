@@ -1,4 +1,10 @@
 /*
+* @Author: Philippe Dales
+* @Date:   2018-07-26 14:26:23
+* @Last Modified by:   Philippe Dales
+* @Last Modified time: 2018-07-26 14:26:23
+*/
+/*
 Beamforming functions.
 */
 #ifndef KEYGEN_H

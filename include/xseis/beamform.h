@@ -1,4 +1,10 @@
 /*
+* @Author: Philippe Dales
+* @Date:   2018-07-26 14:26:23
+* @Last Modified by:   Philippe Dales
+* @Last Modified time: 2018-07-26 14:26:23
+*/
+/*
 Beamforming functions.
 */
 #ifndef BEAMFORM_H
@@ -11,6 +17,57 @@ Beamforming functions.
 
 
 namespace beamform {
+
+void InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, Vector<float>& output, uint32_t blocksize=1024 * 8, float scale_pwr=100)
+{
+	// Divide grid into chunks to prevent cache invalidations during writing (see Ben Baker migrate)
+	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
+	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
+
+	// note these asserts dont work when called through cython (python owned memory)
+	assert((uintptr_t) data_cc.row(1) % MEM_ALIGNMENT == 0);
+	assert((uintptr_t) &output[0] % MEM_ALIGNMENT == 0); 
+
+	// assert((uintptr_t) ttable.row(1) % MEM_ALIGNMENT == 0);	
+
+	// const size_t cclen = data_cc.ncol_;
+	const uint16_t hlen = data_cc.ncol_ / 2;	
+	const size_t ncc = data_cc.nrow_;
+	const uint32_t ngrid = ttable.ncol_;
+	uint32_t blocklen;
+
+	uint16_t *tts_sta1, *tts_sta2;
+	float *cc_ptr = nullptr;
+	float *out_ptr = nullptr;
+
+	// printf("blocksize %lu, ngrid %lu \n", blocksize, ngrid);
+
+	#pragma omp parallel for private(tts_sta1, tts_sta2, cc_ptr, out_ptr, blocklen)
+	for(uint32_t iblock = 0; iblock < ngrid; iblock += blocksize) {
+
+		blocklen = std::min(ngrid - iblock, blocksize);
+		out_ptr = output.data_ + iblock;
+		std::fill(out_ptr, out_ptr + blocklen, 0);
+		
+		for (size_t i = 0; i < ncc; ++i) {				
+
+			tts_sta1 = ttable.row(ckeys(i, 0)) + iblock;	
+			tts_sta2 = ttable.row(ckeys(i, 1)) + iblock;
+			cc_ptr = data_cc.row(i);
+
+			// Migrate single ccf on to grid based on tt difference
+			// #pragma omp simd aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
+			#pragma omp simd aligned(out_ptr, cc_ptr: MEM_ALIGNMENT)			
+			for (size_t j = 0; j < blocklen; ++j) {
+				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
+			}
+		}
+	}
+
+	float norm = scale_pwr / static_cast<float>(ncc);	
+	for(size_t i = 0; i < output.size_; ++i) output[i] *= norm;
+}
+
 
 
 Vector<float> InterLoc(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, float scale_pwr=100)
@@ -199,63 +256,6 @@ void InterLocPatchNoAlign(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, std
 // 	// printf("completed\n");	
 // 	return output;
 // }
-
-void InterLocBlocks(Array2D<float>& data_cc, Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, Vector<float>& output, size_t blocksize=1024 * 5, float scale_pwr=100)
-{
-	// Divide grid into chunks to prevent cache invalidations during writing (see Ben Baker migrate)
-	// This uses less memory but was a bit slower atleast in my typical grid/ccfs sizes
-	// UPdate: When grid sizes >> nccfs and using more than 15 cores faster than InterLoc above
-
-	assert((uintptr_t) data_cc.row(1) % MEM_ALIGNMENT == 0);
-	// assert((uintptr_t) ttable.row(1) % MEM_ALIGNMENT == 0);
-	assert((uintptr_t) output.data_ % MEM_ALIGNMENT == 0);
-	
-
-	// const size_t cclen = data_cc.ncol_;
-	const size_t hlen = data_cc.ncol_ / 2;	
-	const size_t ncc = data_cc.nrow_;
-	const size_t ngrid = ttable.ncol_;
-	size_t blocklen;
-
-	uint16_t *tts_sta1, *tts_sta2;
-	float *cc_ptr = nullptr;
-	float *out_ptr = nullptr;
-
-	output.fill(0);
-	// printf("blocksize %lu, ngrid %lu \n", blocksize, ngrid);
-
-	#pragma omp parallel for private(tts_sta1, tts_sta2, cc_ptr, out_ptr, blocklen)
-	for(size_t iblock = 0; iblock < ngrid; iblock += blocksize) {
-
-		blocklen = std::min(ngrid - iblock, blocksize);
-
-		out_ptr = output.data_ + iblock;
-		// out_ptr = output.data_ + iblock * blocklen;
-		// std::fill(out_ptr, out_ptr + blocklen, 0);
-		
-		for (size_t i = 0; i < ncc; ++i)
-		{				
-			tts_sta1 = ttable.row(ckeys(i, 0)) + iblock;	
-			tts_sta2 = ttable.row(ckeys(i, 1)) + iblock;
-			cc_ptr = data_cc.row(i);
-
-			// Migrate single ccf on to grid based on tt difference
-			// #pragma omp simd aligned(tts_sta1, tts_sta2, out_ptr, cc_ptr: MEM_ALIGNMENT)
-			#pragma omp simd aligned(out_ptr, cc_ptr: MEM_ALIGNMENT)
-			for (size_t j = 0; j < blocklen; ++j) {
-				out_ptr[j] += cc_ptr[hlen + tts_sta2[j] - tts_sta1[j]];
-			}
-		}
-
-	}	
-
-	float norm = scale_pwr / static_cast<float>(ncc);	
-	for(size_t i = 0; i < output.size_; ++i) {
-		output[i] *= norm;
-	}
-
-}
-
 
 void TTCheckValid(Array2D<uint16_t>& ckeys, Array2D<uint16_t>& ttable, uint32_t const wlen)
 {

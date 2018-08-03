@@ -11,7 +11,7 @@ import numpy as np
 import os
 from scipy import fftpack
 from scipy.fftpack import fft, ifft, rfft, fftfreq
-import xutil
+from xseis import xutil
 
 from matplotlib.pyplot import rcParams
 rcParams['figure.figsize'] = 11, 8

@@ -1,5 +1,11 @@
+/*
+* @Author: Philippe Dales
+* @Date:   2018-07-26 14:26:23
+* @Last Modified by:   Philippe Dales
+* @Last Modified time: 2018-07-26 14:26:23
+*/
 // Wrapper for FFTW3, needs quite a bit of work.
-// Would be more flexible if it returned fttw_plans instead of allocated data
+
 
 #ifndef FFTHANDLER_H
 #define FFTHANDLER_H

@@ -6,8 +6,8 @@ os.environ["CXX"] = "g++-7"
 
 
 setup(ext_modules=cythonize(Extension(
-           "csig",                                # the extension name
-           sources=["csig.pyx"],  # the Cython, cpp source
+           "clib",                                # the extension name
+           sources=["clib.pyx"],  # the Cython, cpp source
            language="c++",
            extra_compile_args=["-std=c++17", "-lfftw3f", "-lfftw3f_threads", "-lm", "-O3", "-pthread", "-march=native", "-ffast-math", "-lm", "-fopenmp"],
            extra_link_args=["-fopenmp"],

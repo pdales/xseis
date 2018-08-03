@@ -1,8 +1,11 @@
 /*
+* @Author: Philippe Dales
+* @Date:   2018-07-26 14:26:23
+* @Last Modified by:   Philippe Dales
+* @Last Modified time: 2018-07-26 14:26:23
+*/
+/*
 Signal processing functions.
-
-Dont notice performance difference using omp simd aligned.
-Seems that c++ vectorizes by default when optimizations on.
 */
 
 #ifndef PROCESS_H
@@ -282,19 +285,19 @@ Vector<float> BuildFreqFilter(std::vector<float>& corner_freqs, uint nfreq, floa
 {
 
 	float fsr = (nfreq * 2 - 1) / sr;
-	printf("nfreq: %u, FSR: %.4f\n", nfreq, fsr);
+	// printf("nfreq: %u, FSR: %.4f\n", nfreq, fsr);
 
 	std::vector<uint32_t> cx;
 	for(auto&& cf : corner_freqs) {
 		cx.push_back(static_cast<uint32_t>(cf * fsr + 0.5));
 		// printf("cf/fsr %.2f, %.5f\n", cf, fsr);
 	}
-	printf("filt corner indexes \n");
-	for(auto&& c : cx) {
-		// printf("cx/ cast: %.3f, %u\n", cx, (uint32_t)cx);
-		printf("--%u--", c);
-	}
-	printf("\n");
+	// printf("filt corner indexes \n");
+	// for(auto&& c : cx) {
+	// 	// printf("cx/ cast: %.3f, %u\n", cx, (uint32_t)cx);
+	// 	printf("--%u--", c);
+	// }
+	// printf("\n");
 
 	// whiten corners:  cutmin--porte1---porte2--cutmax
 	auto filter = Vector<float>(nfreq);
@@ -775,7 +778,11 @@ float XCorrEnergy(fftwf_complex const *sig1, fftwf_complex const *sig2, uint32_t
 // 	loc = np.array([ix, iy, iz], dtype=np.float32) * spacing + origin
 // 	return loc
 
-std::vector<float> get_point(size_t index, int spacing, int* origin, int* shape){
+std::vector<float> get_point(size_t index, int* gdef){
+
+	int* shape = &gdef[0];
+	int* origin = &gdef[3];
+	int spacing = gdef[6];
 	
 	int nx = shape[0];			
 	int ny = shape[1];			
