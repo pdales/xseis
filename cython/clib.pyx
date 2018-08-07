@@ -23,13 +23,6 @@ cdef extern from "xseis/structures.h":
 		size_t size_
 
 
-cdef extern from "xseis/interloc.h" namespace "interloc":
-
-	void Search(Arr_f& data, Arr_f& stalocs, Vec_ui16& chanmap, int* tmeta, Arr_ui16& ttable, float *outbuf)
-
-	void CorrSearchDec2X(Arr_f& data, float sr, Arr_f& stalocs, Vec_ui16& chanmap, Arr_ui16& ttable, uint32_t *outbuf, Vec_f& output, uint32_t nthreads)
-
-
 def fCorrSearchDec2X(np.ndarray[np.float32_t, ndim=2] data,
 					sr,
 					np.ndarray[np.float32_t, ndim=2] stalocs,
@@ -68,5 +61,11 @@ def fSearch(np.ndarray[np.float32_t, ndim=2] data,
 					&outbuf[0],
 					)
 
+
+cdef extern from "xseis/interloc.h" namespace "interloc":
+
+	void Search(Arr_f& data, Arr_f& stalocs, Vec_ui16& chanmap, int* tmeta, Arr_ui16& ttable, float *outbuf)
+
+	void CorrSearchDec2X(Arr_f& data, float sr, Arr_f& stalocs, Vec_ui16& chanmap, Arr_ui16& ttable, uint32_t *outbuf, Vec_f& output, uint32_t nthreads)
 
 
