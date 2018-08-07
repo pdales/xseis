@@ -29,7 +29,6 @@ cdef extern from "xseis/interloc.h" namespace "interloc":
 
 	void CorrSearchDec2X(Arr_f& data, float sr, Arr_f& stalocs, Vec_ui16& chanmap, Arr_ui16& ttable, uint32_t *outbuf, Vec_f& output, uint32_t nthreads)
 
-	# void CorrSearchDec2X(Array2D<float>& rdat, float sr, Array2D<float>& stalocs, Vector<uint16_t>& chanmap, Array2D<uint16_t>& ttable, uint32_t* outbuf, Vector<float>& output, uint32_t nthreads=4) 
 
 def fCorrSearchDec2X(np.ndarray[np.float32_t, ndim=2] data,
 					sr,
@@ -53,7 +52,7 @@ def fCorrSearchDec2X(np.ndarray[np.float32_t, ndim=2] data,
 
 
 
-def search_py(np.ndarray[np.float32_t, ndim=2] data,
+def fSearch(np.ndarray[np.float32_t, ndim=2] data,
 			  np.ndarray[np.float32_t, ndim=2] stalocs,
 			  np.ndarray[np.uint16_t, ndim=1] chanmap,
 			  np.ndarray[int, ndim=1] tmeta,
