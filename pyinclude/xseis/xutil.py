@@ -28,13 +28,13 @@ def get_pt(index, shape, spacing, origin):
 
 
 def imax_to_xyz_gdef(index, gdef):
-	shape, origin, spacing = gdef[:3], gdef[3:6], gdef[6]
+	shape, origin, spacing = gdef[:3], gdef[3:6], float(gdef[6])
 	nx, ny, nz = shape
 	iz = index % nz
 	iy = ((index - iz) // nz) % ny
 	ix = index // (nz * ny)
 
-	loc = np.array([ix, iy, iz]) * spacing + origin
+	loc = np.array([ix, iy, iz], dtype=float) * spacing + origin
 	return loc
 
 

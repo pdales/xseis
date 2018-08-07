@@ -17,12 +17,11 @@ def stream_to_buffer(st, t0, npts):
 
 	sr = st[0].stats.sampling_rate
 	nsig = len(st)
-	npts = 6000
 	data = np.zeros((nsig, npts), dtype=np.float32)
 	for i, tr in enumerate(st):
 		i0 = int((tr.stats.starttime - t0) * sr + 0.5)
 		sig = tr.data
-		slen = min(len(sig), npts)
+		slen = min(len(sig), npts - i0)
 		data[i, i0: i0 + slen] = sig[:slen]
 	return data
 
