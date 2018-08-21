@@ -25,10 +25,10 @@ size_t PadToBytes(const size_t size, const uint32_t nbytes=CACHE_LINE)
 {    
 	const uint32_t paddingElements = nbytes / sizeof(T);    
 	const uint32_t mod = size % paddingElements;
-	uint32_t ipad;
-	
+	uint32_t ipad;	
 	mod == 0 ? ipad = 0 : ipad = paddingElements - mod;
-	return size + ipad;	
+	return size + ipad;
+
 }
 
 std::vector<size_t> WinsAlignedF32(size_t npts, size_t wlen, float overlap) 
@@ -469,6 +469,16 @@ void PrintVec(std::vector<T> v){
 	printf("\n");
 }
 
+std::string EpochMili(){
+	typedef std::chrono::milliseconds ms;	
+	uint64_t stamp = std::chrono::duration_cast<ms>(
+		std::chrono::system_clock::now().time_since_epoch()).count();
+	std::cout << "stamp: " << stamp << '\n';
+	return std::to_string(stamp);
+}
+
+
+// );
 
 
 

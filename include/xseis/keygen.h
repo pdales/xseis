@@ -26,13 +26,13 @@ size_t NChoose2(size_t n)
 }
 
 
-ChanGroups RandGroupsN(std::vector<uint16_t> keys, uint32_t ngroup) {
+ChanGroups RandGroupsN(std::vector<uint16_t>& keys, uint32_t ngroup) {
 	
 	// auto keys = utils::arange<uint16_t>(0, nkeys);
 	auto kc = keys;	
 	std::srand(std::time(0));
 	std::random_shuffle(kc.begin(), kc.end());
-
+	
 	uint32_t chunk = keys.size() / ngroup;
 	uint32_t remain = keys.size() % ngroup;
 	ChanGroups kgroup;
